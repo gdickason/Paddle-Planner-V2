@@ -1631,9 +1631,10 @@ function renderWxWindArrows() {
 }
 
 function buildWindArrowSVG(dir, speed, col, large=false) {
-  const size = large ? 60 : 48;
+  // V2: Refined - smaller, less distracting
+  const size = large ? 50 : 35;  // Reduced from 48
   const half = size / 2;
-  const len = large ? 18 : 14;
+  const len = large ? 16 : 11;  // Shorter arrows
   const r = dir*Math.PI/180;
   const sx=Math.sin(r)*len, sy=-Math.cos(r)*len;
   const tx=half-sx, ty=half-sy, bx=half+sx, by=half+sy;
@@ -1641,11 +1642,12 @@ function buildWindArrowSVG(dir, speed, col, large=false) {
   const px1=tx+sy*headSize, py1=ty-sx*headSize;
   const px2=tx-sy*headSize, py2=ty+sx*headSize;
   const fontSize = large ? 10 : 8;
-  return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-    <line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="${large?3:2}" stroke-linecap="round" opacity="0.9"/>
-    <polygon points="${tx},${ty} ${px1},${py1} ${px2},${py2}" fill="${col}" opacity="0.9"/>
-    <text x="${half}" y="${size-3}" text-anchor="middle" fill="${col}" font-size="${fontSize}" font-weight="bold" font-family="monospace" stroke="black" stroke-width="2.5" paint-order="stroke">${Math.round(speed)}</text>
+  return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" style="opacity:0.75">
+    <line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="${large?2.5:1.8}" stroke-linecap="round"/>
+    <polygon points="${tx},${ty} ${px1},${py1} ${px2},${py2}" fill="${col}"/>
+    <text x="${half}" y="${size-3}" text-anchor="middle" fill="${col}" font-size="${fontSize}" font-weight="bold" font-family="monospace" stroke="#020c1a" stroke-width="2.5" paint-order="stroke">${Math.round(speed)}</text>
   </svg>`;
+}
 }
 
 function buildCurrentArrowSVG(dir, speed, col) {
@@ -1664,11 +1666,14 @@ function buildCurrentArrowSVG(dir, speed, col) {
 
 function getTripDates(trip) {
   if (!trip?.startDate) return [];
+  // V2 FIX: Ensure Day 1 = Start Date, Last Day = End Date
   const start = new Date(trip.startDate+'T00:00:00');
   const end   = trip.endDate ? new Date(trip.endDate+'T00:00:00') : new Date(start.getTime()+6*86400000);
   const dates = [];
-  for (let d=new Date(start); d<=end; d=new Date(d.getTime()+86400000))
+  // Include both start and end dates (inclusive range)
+  for (let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) {
     dates.push(d.toISOString().split('T')[0]);
+  }
   return dates;
 }
 
