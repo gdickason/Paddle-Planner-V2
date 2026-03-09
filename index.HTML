@@ -1,0 +1,2085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paddle Planner — Sea Kayak Adventure Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+:root {
+  --bg:      #020c1a;
+  --panel:   #071525;
+  --card:    #0a1c2e;
+  --border:  #122238;
+  --b2:      #1e3a55;
+  --cyan:    #22d3ee;
+  --cyan2:   #0891b2;
+  --amber:   #f59e0b;
+  --green:   #4ade80;
+  --red:     #f87171;
+  --text:    #e2e8f0;
+  --muted:   #64748b;
+  --dim:     #2a4a6a;
+  --mono:    'Space Mono', monospace;
+  --sans:    'DM Sans', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--sans); }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 99px; }
+
+input, select, textarea {
+  background: var(--bg);
+  border: 1.5px solid var(--b2);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 8px 11px;
+  font-size: 12px;
+  font-family: var(--sans);
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--cyan); }
+select option { background: var(--panel); }
+input[type=range] { accent-color: var(--cyan); padding: 0; border: none; background: transparent; }
+input[type=checkbox] { width: auto; accent-color: var(--cyan); }
+button { cursor: pointer; font-family: var(--sans); }
+label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 4px; }
+
+/* Layout */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* Nav */
+#nav {
+  height: 52px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  z-index: 100;
+}
+.nav-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 20px;
+  border-right: 1px solid var(--border);
+  height: 100%;
+  flex-shrink: 0;
+}
+.nav-brand .logo { font-size: 20px; }
+.nav-brand .name { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--cyan); letter-spacing: 0.15em; }
+.nav-tabs { display: flex; height: 100%; }
+.nav-tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--muted);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.nav-tab:hover { color: var(--text); }
+.nav-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+.nav-tab .tab-icon { font-size: 13px; }
+.nav-spacer { flex: 1; }
+.nav-trip-select {
+  padding: 0 16px;
+  border-left: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--muted);
+}
+.nav-trip-select select { width: 180px; font-size: 11px; padding: 5px 8px; }
+
+/* Page container */
+#pages { flex: 1; min-height: 0; overflow: hidden; position: relative; }
+.page { display: none; height: 100%; overflow: hidden; }
+.page.active { display: flex; flex-direction: column; }
+
+/* ── DASHBOARD ── */
+#page-dashboard { overflow-y: auto; padding: 28px; }
+.dash-grid { max-width: 1100px; margin: 0 auto; }
+.dash-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+.dash-title { font-size: 22px; font-weight: 700; color: var(--text); }
+.dash-sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
+.btn-primary { background: var(--cyan); border: none; color: var(--bg); border-radius: 8px; padding: 10px 20px; font-weight: 700; font-size: 12px; font-family: var(--sans); }
+.btn-ghost { background: transparent; border: 1.5px solid var(--b2); color: var(--muted); border-radius: 8px; padding: 9px 16px; font-family: var(--sans); font-size: 12px; }
+.btn-amber { background: var(--amber); border: none; color: var(--bg); border-radius: 8px; padding: 9px 20px; font-weight: 700; font-size: 12px; font-family: var(--sans); }
+
+.new-trip-form { background: var(--card); border: 1px solid var(--b2); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+.form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.col-span-2 { grid-column: 1 / 3; }
+.col-span-3 { grid-column: 1 / 4; }
+.form-actions { display: flex; gap: 8px; margin-top: 14px; }
+
+.stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+.card-label { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; }
+
+/* Readiness */
+.readiness-pct { font-size: 38px; font-weight: 800; line-height: 1; margin-bottom: 8px; font-family: var(--mono); }
+.readiness-bar-track { background: var(--border); border-radius: 99px; height: 6px; margin-bottom: 14px; }
+.readiness-bar-fill { height: 6px; border-radius: 99px; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); }
+.check-item { display: flex; gap: 8px; align-items: center; padding: 3px 0; font-size: 11px; }
+.check-dot { flex-shrink: 0; font-size: 13px; }
+
+/* Go/No-Go */
+.gng-card { border-radius: 12px; padding: 18px; border: 1.5px solid; }
+.gng-card.go    { background: rgba(74,222,128,0.06);  border-color: var(--green); }
+.gng-card.caution { background: rgba(253,224,71,0.06); border-color: #fde047; }
+.gng-card.nogo  { background: rgba(248,113,113,0.06); border-color: var(--red); }
+.gng-status { font-size: 17px; font-weight: 800; margin-bottom: 10px; font-family: var(--mono); }
+.gng-row { display: flex; gap: 8px; align-items: center; padding: 3px 0; font-size: 11px; }
+.gng-icon { width: 12px; flex-shrink: 0; font-size: 10px; }
+.gng-name { color: var(--muted); width: 82px; flex-shrink: 0; }
+.gng-val { color: var(--text); font-weight: 600; }
+
+/* Quick stats cards */
+.qs-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.qs-label { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; }
+.qs-value { color: var(--cyan); font-size: 20px; font-weight: 800; font-family: var(--mono); }
+.qs-sub { color: var(--amber); font-size: 10px; margin-top: 2px; }
+.qs-btn { background: transparent; border: 1px solid var(--b2); color: var(--muted); border-radius: 6px; padding: 5px 10px; font-size: 10px; font-family: var(--sans); }
+
+/* Trip list */
+.trip-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 10px; margin-top: 10px; }
+.trip-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; padding: 14px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.trip-card:hover { border-color: var(--b2); }
+.trip-card.active { background: rgba(34,211,238,0.05); border-color: var(--cyan); }
+.trip-card-name { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+.trip-card-meta { color: var(--muted); font-size: 11px; }
+.trip-card-dates { color: var(--dim); font-size: 10px; margin-top: 3px; font-family: var(--mono); }
+.trip-card-top { display: flex; justify-content: space-between; }
+.trip-del { background: transparent; border: none; color: var(--dim); font-size: 18px; line-height: 1; padding: 0; }
+.section-label { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; }
+.empty-state { text-align: center; padding: 50px 0; color: var(--dim); }
+.empty-icon { font-size: 40px; margin-bottom: 10px; }
+
+/* ── ROUTE PLANNER ── */
+#page-route { flex-direction: row !important; }
+#route-sidebar {
+  width: 240px; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-head { padding: 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sidebar-trip-name { color: var(--cyan); font-weight: 700; font-size: 13px; }
+.sidebar-trip-area { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.route-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.route-stat { background: var(--bg); border-radius: 7px; padding: 7px 9px; }
+.route-stat-label { color: var(--dim); font-size: 9px; text-transform: uppercase; }
+.route-stat-val { color: var(--cyan); font-weight: 700; font-size: 15px; font-family: var(--mono); }
+.wp-list { flex: 1; overflow-y: auto; padding: 8px 14px; }
+.wp-item { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(18,34,56,0.8); }
+.wp-badge { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; flex-shrink: 0; font-family: var(--mono); }
+.wp-info { flex: 1; }
+.wp-name { font-size: 11px; font-weight: 600; color: var(--text); }
+.wp-coords { font-size: 9px; color: var(--dim); font-family: var(--mono); }
+.wp-del { background: transparent; border: none; color: var(--dim); font-size: 16px; }
+.sidebar-actions { display: flex; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.sidebar-actions button { flex: 1; border-radius: 7px; padding: 8px 0; font-size: 10px; font-weight: 700; font-family: var(--sans); border: 1.5px solid; transition: all 0.15s; }
+#map-wrap { flex: 1; position: relative; }
+#route-map, #weather-map { width: 100%; height: 100%; }
+.map-no-trip { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; background: var(--bg); z-index: 10; }
+
+/* Campsite modal */
+.modal-overlay { position: absolute; inset: 0; background: rgba(2,12,26,0.88); display: flex; align-items: center; justify-content: center; z-index: 500; }
+.modal-box { background: var(--panel); border: 1px solid var(--b2); border-radius: 14px; padding: 24px; width: 360px; }
+.modal-title { font-size: 15px; font-weight: 800; margin-bottom: 4px; }
+.modal-sub { color: var(--muted); font-size: 11px; margin-bottom: 16px; font-family: var(--mono); }
+.modal-fields { display: flex; flex-direction: column; gap: 9px; }
+
+/* Leaflet overrides */
+.leaflet-container { background: #0a1628; font-family: var(--sans); }
+.leaflet-control-zoom a { background: rgba(10,22,40,0.95) !important; border-color: var(--b2) !important; color: var(--text) !important; }
+.leaflet-control-zoom a:hover { background: var(--b2) !important; }
+.leaflet-bar { border: 1px solid var(--b2) !important; border-radius: 8px !important; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important; }
+.leaflet-popup-content-wrapper { background: var(--panel); border: 1px solid var(--b2); border-radius: 10px; box-shadow: 0 4px 24px rgba(0,0,0,0.5); color: var(--text); }
+.leaflet-popup-tip { background: var(--panel); }
+.leaflet-popup-content { font-family: var(--sans); font-size: 12px; margin: 12px 14px; }
+.wp-popup-name { font-weight: 700; font-size: 13px; color: var(--cyan); margin-bottom: 4px; }
+.wp-popup-coords { color: var(--muted); font-size: 10px; font-family: var(--mono); margin-bottom: 10px; }
+.wp-popup-del { background: var(--red); border: none; color: white; border-radius: 6px; padding: 5px 12px; font-size: 11px; font-weight: 700; font-family: var(--sans); width: 100%; }
+.camp-popup-name { font-weight: 700; font-size: 13px; color: var(--amber); margin-bottom: 3px; }
+.camp-popup-meta { color: var(--muted); font-size: 10px; margin-bottom: 8px; }
+.camp-popup-del { background: transparent; border: 1px solid var(--dim); color: var(--muted); border-radius: 6px; padding: 4px 10px; font-size: 11px; font-family: var(--sans); }
+.layer-control { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 400; background: rgba(7,21,37,0.97); border: 1px solid var(--b2); border-radius: 12px; display: flex; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.6); }
+.layer-btn { background: transparent; border: none; color: var(--muted); padding: 9px 16px; font-size: 11px; font-weight: 700; font-family: var(--mono); display: flex; align-items: center; gap: 5px; border-right: 1px solid var(--border); transition: all 0.15s; }
+.layer-btn:last-child { border-right: none; }
+.layer-btn.active { color: var(--bg); background: var(--cyan); }
+
+/* ── WEATHER STATION ── */
+#page-weather { flex-direction: column !important; }
+.wx-daytabs { padding: 8px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 5px; overflow-x: auto; flex-shrink: 0; align-items: center; }
+.wx-daytab { flex-shrink: 0; padding: 7px 11px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--card); color: var(--muted); cursor: pointer; text-align: center; min-width: 62px; font-family: var(--sans); transition: all 0.15s; position: relative; }
+.wx-daytab:hover { border-color: var(--b2); color: var(--text); }
+.wx-daytab.active { background: var(--cyan); border-color: var(--cyan); color: var(--bg); }
+.wx-daytab.trip-day { border-color: rgba(34,211,238,0.4); }
+.wx-daytab .trip-badge { position: absolute; top: -7px; left: 50%; transform: translateX(-50%); background: var(--cyan); color: var(--bg); font-size: 7px; font-weight: 800; border-radius: 99px; padding: 1px 5px; white-space: nowrap; font-family: var(--mono); }
+.wx-daytab .day-name { font-size: 11px; font-weight: 700; }
+.wx-daytab .day-date { font-size: 9px; opacity: 0.7; }
+.wx-daytab .day-hi-lo { font-size: 10px; font-weight: 600; margin-top: 1px; }
+.wx-daytab .day-wind { font-size: 10px; font-weight: 700; margin-top: 1px; }
+.wx-body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+.wx-panel { width: 320px; flex-shrink: 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.wx-slider-wrap { padding: 10px 14px 6px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.wx-slider-info { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-bottom: 5px; }
+.wx-slider-ticks { display: flex; justify-content: space-between; color: var(--dim); font-size: 8px; margin-top: 3px; font-family: var(--mono); }
+.wx-data-scroll { flex: 1; overflow-y: auto; padding: 12px 14px; }
+.gng-full { border-radius: 10px; padding: 12px 14px; border: 1.5px solid; margin-bottom: 12px; }
+.gng-full.go    { background: rgba(74,222,128,0.06);  border-color: var(--green); }
+.gng-full.caution { background: rgba(253,224,71,0.07); border-color: #fde047; }
+.gng-full.nogo  { background: rgba(248,113,113,0.06); border-color: var(--red); }
+.gng-full-status { font-size: 15px; font-weight: 800; margin-bottom: 9px; font-family: var(--mono); }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.stat-box { background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; }
+.stat-label { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+.stat-val { font-weight: 800; font-size: 17px; font-family: var(--mono); }
+.stat-sub { color: var(--muted); font-size: 10px; margin-top: 2px; }
+.bar-chart { margin-bottom: 10px; }
+.bar-chart-label { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px; }
+.bars { display: flex; gap: 2px; align-items: flex-end; }
+.bar { flex: 1; border-radius: 2px 2px 0 0; cursor: pointer; transition: opacity 0.1s; min-height: 3px; }
+.bar:hover { opacity: 0.8; }
+.bar.active-bar { outline: 1px solid white; }
+.bar-ticks { display: flex; justify-content: space-between; color: var(--dim); font-size: 8px; margin-top: 2px; font-family: var(--mono); }
+.wx-map-wrap { flex: 1; position: relative; min-width: 0; }
+.wx-trip-days { border-top: 1px solid var(--border); padding: 10px 16px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; background: var(--panel); overflow-x: auto; }
+.wx-trip-days-label { color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; flex-shrink: 0; font-family: var(--mono); }
+.trip-day-btn { flex-shrink: 0; padding: 6px 14px; border-radius: 8px; border: 1.5px solid var(--b2); background: var(--bg); color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 700; font-family: var(--sans); transition: all 0.15s; }
+.trip-day-btn:hover { border-color: var(--amber); color: var(--text); }
+.trip-day-btn.active { background: var(--amber); border-color: var(--amber); color: var(--bg); }
+.trip-day-btn.all-btn.active { background: var(--cyan); border-color: var(--cyan); color: var(--bg); }
+.trip-day-btn.out-of-range { opacity: 0.35; cursor: default; }
+.wind-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; font-family: var(--mono); }
+.wx-loading { padding: 30px; text-align: center; color: var(--muted); font-size: 12px; }
+.wx-error { padding: 16px; color: var(--red); font-size: 11px; background: rgba(248,113,113,0.07); border-radius: 8px; margin: 10px; }
+
+/* ── GEAR MANAGER ── */
+#page-gear { flex-direction: column !important; }
+.gear-topbar { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+.gear-progress-track { flex: 1; background: var(--border); border-radius: 99px; height: 8px; }
+.gear-progress-fill { height: 8px; border-radius: 99px; background: var(--cyan); transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
+.gear-packed-count { font-family: var(--mono); font-weight: 700; font-size: 18px; color: var(--cyan); flex-shrink: 0; }
+.gear-ess-warn { color: var(--red); font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.gear-cats { padding: 8px 20px; border-bottom: 1px solid var(--border); display: flex; gap: 5px; overflow-x: auto; flex-shrink: 0; }
+.cat-btn { flex-shrink: 0; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 10px; font-weight: 700; font-family: var(--sans); transition: all 0.15s; }
+.cat-btn.active { background: var(--cyan); border-color: var(--cyan); color: var(--bg); }
+.gear-body { flex: 1; overflow-y: auto; padding: 0 20px 20px; }
+.gear-cat-header { display: flex; align-items: center; gap: 10px; margin-top: 18px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.gear-cat-name { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; flex: 1; }
+.gear-cat-count { background: var(--border); color: var(--muted); border-radius: 99px; padding: 2px 8px; font-size: 9px; font-weight: 700; font-family: var(--mono); }
+.gear-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(18,34,56,0.4); }
+.gear-check { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--b2); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.15s; }
+.gear-check.checked { background: var(--cyan); border-color: var(--cyan); }
+.gear-item-name { flex: 1; font-size: 12px; cursor: pointer; transition: color 0.15s; }
+.gear-item-name.done { text-decoration: line-through; color: var(--dim); }
+.gear-ess-tag { color: var(--red); font-size: 9px; font-weight: 700; margin-left: 4px; }
+.gear-del { background: transparent; border: none; color: var(--dim); font-size: 15px; }
+.gear-edit-bar { padding: 12px 20px; border-top: 1px solid var(--border); flex-shrink: 0; display: flex; gap: 8px; align-items: center; }
+.gear-add-form { display: flex; gap: 8px; flex: 1; align-items: center; }
+.gear-add-form input { flex: 1; }
+.gear-add-form select { width: 110px; flex-shrink: 0; }
+.ess-label { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; cursor: pointer; white-space: nowrap; }
+
+/* ── CAMPSITES ── */
+#page-campsites { flex-direction: column !important; }
+.camps-topbar { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.camps-title { font-size: 15px; font-weight: 700; }
+.camps-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.camps-add-panel { padding: 14px 20px; border-bottom: 1px solid var(--border); background: rgba(245,158,11,0.03); flex-shrink: 0; display: none; }
+.camps-add-panel.open { display: block; }
+.camps-filters { padding: 8px 20px; border-bottom: 1px solid var(--border); display: flex; gap: 5px; flex-shrink: 0; }
+.filter-btn { padding: 4px 12px; border-radius: 99px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 10px; font-weight: 700; font-family: var(--sans); transition: all 0.15s; }
+.filter-btn.active { background: var(--amber); border-color: var(--amber); color: var(--bg); }
+.camps-grid-wrap { flex: 1; overflow-y: auto; padding: 16px 20px; }
+.camps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px,1fr)); gap: 12px; }
+.camp-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; transition: border-color 0.15s; }
+.camp-card:hover { border-color: var(--b2); }
+.camp-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.camp-name { color: var(--amber); font-weight: 800; font-size: 14px; }
+.camp-type-coords { color: var(--muted); font-size: 10px; margin-top: 2px; font-family: var(--mono); }
+.camp-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+.camp-tag { border-radius: 99px; padding: 2px 8px; font-size: 9px; font-weight: 700; border: 1px solid; }
+.camp-tag.free    { background: rgba(74,222,128,0.08); border-color: var(--green);   color: var(--green); }
+.camp-tag.fee     { background: rgba(253,224,71,0.08);  border-color: #fde047;        color: #fde047; }
+.camp-tag.permit  { background: rgba(251,146,60,0.08);  border-color: #fb923c;        color: #fb923c; }
+.camp-tag.private { background: rgba(148,163,184,0.08); border-color: var(--muted);  color: var(--muted); }
+.camp-tag.cost    { background: rgba(100,116,139,0.08); border-color: var(--b2);     color: var(--muted); }
+.camp-rating { color: var(--amber); font-size: 12px; }
+.camp-del { background: transparent; border: none; color: var(--dim); font-size: 17px; }
+.camp-notes { color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+/* Waypoint day assignment */
+.wp-day-badge { display: inline-flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; font-family: var(--mono); border-radius: 4px; padding: 1px 5px; margin-left: 4px; background: var(--amber); color: var(--bg); cursor: pointer; transition: all 0.15s; }
+.wp-day-badge:hover { opacity: 0.8; }
+.wp-day-select { background: var(--bg); border: 1px solid var(--b2); color: var(--text); border-radius: 5px; font-size: 10px; font-family: var(--sans); padding: 2px 4px; width: 100%; margin-top: 3px; }
+
+/* GPX Export section */
+.gpx-section { padding: 10px 14px; border-top: 1px solid var(--border); flex-shrink: 0; background: rgba(34,211,238,0.02); }
+.gpx-section-label { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 7px; }
+.gpx-btn { width: 100%; background: transparent; border: 1.5px solid var(--cyan2); color: var(--cyan); border-radius: 7px; padding: 8px; font-size: 10px; font-weight: 700; font-family: var(--mono); display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s; }
+.gpx-btn:hover { background: rgba(34,211,238,0.1); }
+.gpx-options { display: flex; gap: 5px; margin-bottom: 7px; }
+.gpx-opt { flex: 1; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 9px; font-weight: 700; font-family: var(--mono); padding: 4px 0; text-align: center; cursor: pointer; transition: all 0.15s; }
+.gpx-opt.active { background: rgba(34,211,238,0.12); border-color: var(--cyan2); color: var(--cyan); }
+
+/* Currents overlay toggle */
+.wx-overlay-controls { position: absolute; top: 12px; right: 12px; z-index: 400; display: flex; flex-direction: column; gap: 6px; }
+.wx-overlay-btn { background: rgba(7,21,37,0.95); border: 1.5px solid var(--b2); color: var(--muted); border-radius: 8px; padding: 7px 13px; font-size: 10px; font-weight: 700; font-family: var(--mono); transition: all 0.15s; }
+.wx-overlay-btn.active { border-color: var(--cyan); color: var(--cyan); }
+.wx-overlay-btn.currents-active { border-color: #a78bfa; color: #a78bfa; }
+
+/* Day-colored route segments on weather map */
+.day-legend { position: absolute; bottom: 50px; left: 12px; z-index: 400; background: rgba(7,21,37,0.95); border: 1px solid var(--b2); border-radius: 10px; padding: 9px 12px; display: flex; flex-direction: column; gap: 5px; max-width: 160px; }
+.day-legend-title { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px; }
+.day-legend-item { display: flex; align-items: center; gap: 6px; font-size: 10px; font-family: var(--mono); }
+.day-legend-swatch { width: 20px; height: 3px; border-radius: 2px; }
+
+/* Toasts */
+#toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--b2); color: var(--text); padding: 10px 20px; border-radius: 99px; font-size: 12px; font-weight: 600; z-index: 9999; opacity: 0; transition: opacity 0.2s; pointer-events: none; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+#toast.show { opacity: 1; }
+
+/* Map attribution fix */
+.leaflet-control-attribution { background: rgba(2,12,26,0.8) !important; color: var(--muted) !important; font-size: 9px !important; }
+.leaflet-control-attribution a { color: var(--muted) !important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- NAV -->
+  <nav id="nav">
+    <div class="nav-brand"><span class="logo">🛶</span><span class="name">PADDLE PLANNER</span></div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-page="dashboard"><span class="tab-icon">⊞</span>Dashboard</button>
+      <button class="nav-tab" data-page="route"><span class="tab-icon">🗺</span>Route</button>
+      <button class="nav-tab" data-page="weather"><span class="tab-icon">🌊</span>Weather</button>
+      <button class="nav-tab" data-page="gear"><span class="tab-icon">🎒</span>Gear</button>
+      <button class="nav-tab" data-page="campsites"><span class="tab-icon">⛺</span>Campsites</button>
+    </div>
+    <div class="nav-spacer"></div>
+    <div class="nav-trip-select" id="nav-trip-select" style="display:none">
+      <span>Trip:</span>
+      <select id="nav-trip-picker"></select>
+    </div>
+  </nav>
+
+  <div id="pages">
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="dash-grid">
+        <div class="dash-header">
+          <div>
+            <div class="dash-title" id="dash-trip-name">Paddle Planner</div>
+            <div class="dash-sub" id="dash-trip-sub">Create a trip below to start planning your expedition</div>
+          </div>
+          <button class="btn-primary" id="toggle-new-trip-form">+ New Trip</button>
+        </div>
+
+        <div id="new-trip-form" style="display:none">
+          <div class="new-trip-form">
+            <div style="color:var(--cyan);font-weight:800;font-size:13px;margin-bottom:14px;font-family:var(--mono)">NEW ADVENTURE</div>
+            <div class="form-grid-2">
+              <div class="col-span-2 form-grid-2" style="margin-bottom:0">
+                <div><label>Trip Name *</label><input id="nf-name" placeholder="Outer Banks Expedition"></div>
+                <div><label>Area / Region</label><input id="nf-area" placeholder="NC Barrier Islands"></div>
+              </div>
+              <div><label>Start Date</label><input id="nf-start" type="date"></div>
+              <div><label>End Date</label><input id="nf-end" type="date"></div>
+            </div>
+            <div><label>Notes</label><textarea id="nf-notes" placeholder="Route overview, goals, logistics…" style="min-height:52px;resize:vertical"></textarea></div>
+            <div class="form-actions">
+              <button class="btn-primary" id="create-trip-btn">Create Trip</button>
+              <button class="btn-ghost" id="cancel-trip-form">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="dash-active" style="display:none">
+          <div class="stats-row">
+            <!-- Readiness -->
+            <div class="card">
+              <div class="card-label">Trip Readiness</div>
+              <div class="readiness-pct" id="dash-pct">0%</div>
+              <div class="readiness-bar-track"><div class="readiness-bar-fill" id="dash-bar" style="width:0%;background:var(--red)"></div></div>
+              <div id="dash-checks"></div>
+            </div>
+            <!-- Go/No-Go -->
+            <div id="dash-gng" class="gng-card go">
+              <div class="gng-status" id="dash-gng-status">Loading…</div>
+              <div id="dash-gng-rows"></div>
+              <button class="btn-ghost" style="margin-top:10px;font-size:10px;padding:5px 10px" onclick="showPage('weather')">Full forecast →</button>
+            </div>
+            <!-- Quick stats -->
+            <div>
+              <div class="qs-card">
+                <div><div class="qs-label">Route Distance</div><div class="qs-value" id="qs-dist">—</div><div class="qs-sub" id="qs-dist-sub"></div></div>
+                <button class="qs-btn" onclick="showPage('route')">Plan →</button>
+              </div>
+              <div class="qs-card">
+                <div><div class="qs-label">Gear Packed</div><div class="qs-value" id="qs-gear">—</div><div class="qs-sub" id="qs-gear-sub"></div></div>
+                <button class="qs-btn" onclick="showPage('gear')">Manage →</button>
+              </div>
+              <div class="qs-card">
+                <div><div class="qs-label">Campsites</div><div class="qs-value" id="qs-camps">0</div><div class="qs-sub" id="qs-camps-sub"></div></div>
+                <button class="qs-btn" onclick="showPage('campsites')">Log →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label">All Adventures</div>
+          <div id="trip-list" class="trip-list">
+            <div class="empty-state"><div class="empty-icon">🛶</div><div>No trips yet — create one above</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROUTE PLANNER -->
+    <div class="page" id="page-route">
+      <div id="route-sidebar">
+        <div class="sidebar-head">
+          <div id="sidebar-trip-name" class="sidebar-trip-name" style="color:var(--dim)">No trip selected</div>
+          <div id="sidebar-trip-area" class="sidebar-trip-area"></div>
+        </div>
+        <div class="route-stats" id="route-stats" style="display:none">
+          <div class="route-stat"><div class="route-stat-label">Distance</div><div class="route-stat-val" id="rt-dist">—</div></div>
+          <div class="route-stat"><div class="route-stat-label">Est. Days</div><div class="route-stat-val" id="rt-days">—</div></div>
+        </div>
+        <div class="wp-list" id="wp-list"><div style="color:var(--dim);font-size:11px;text-align:center;padding:20px 0">Press "+ WP" then click the map</div></div>
+        <div class="sidebar-actions">
+          <button id="add-wp-btn" style="background:var(--bg);border-color:var(--b2);color:var(--muted)">+ WP</button>
+          <button id="add-camp-btn" style="background:var(--bg);border-color:var(--b2);color:var(--muted)">⛺ Site</button>
+        </div>
+        <!-- GPX Export -->
+        <div class="gpx-section" id="gpx-section" style="display:none">
+          <div class="gpx-section-label">↓ Export Route</div>
+          <div class="gpx-options">
+            <button class="gpx-opt active" id="gpx-opt-all" onclick="setGpxExportMode('all')">All WPs</button>
+            <button class="gpx-opt" id="gpx-opt-day" onclick="setGpxExportMode('day')">By Day</button>
+          </div>
+          <div id="gpx-day-select-wrap" style="display:none;margin-bottom:7px">
+            <select id="gpx-day-select" style="font-size:10px;padding:4px 7px"></select>
+          </div>
+          <button class="gpx-btn" id="gpx-export-btn" onclick="exportGPX()">⬇ Download GPX</button>
+        </div>
+      </div>
+      <div id="map-wrap">
+        <div id="route-map"></div>
+        <div id="map-no-trip" class="map-no-trip">
+          <div style="font-size:48px">🛶</div>
+          <div style="font-size:16px;font-weight:700">Create a trip in Dashboard first</div>
+          <button class="btn-primary" onclick="showPage('dashboard')">Go to Dashboard</button>
+        </div>
+        <!-- Location search -->
+        <div id="map-search" style="position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:400;display:flex;gap:6px;width:320px">
+          <input id="map-search-input" placeholder="🔍 Search location…" style="flex:1;background:rgba(7,21,37,0.97);border:1.5px solid var(--b2);color:var(--text);border-radius:8px;padding:7px 12px;font-size:12px;font-family:var(--sans);outline:none;box-shadow:0 4px 20px rgba(0,0,0,0.5)">
+          <button id="map-search-btn" style="background:rgba(7,21,37,0.97);border:1.5px solid var(--cyan);color:var(--cyan);border-radius:8px;padding:7px 14px;font-size:11px;font-weight:700;font-family:var(--mono);box-shadow:0 4px 20px rgba(0,0,0,0.5)">GO</button>
+        </div>
+        <!-- Layer control -->
+        <div class="layer-control" id="layer-control">
+          <button class="layer-btn active" data-layer="satellite">🛰 Satellite</button>
+          <button class="layer-btn" data-layer="osm">🗺 Street</button>
+          <button class="layer-btn" data-layer="topo">⛰ Topo</button>
+        </div>
+        <!-- Campsite modal -->
+        <div class="modal-overlay" id="camp-modal" style="display:none">
+          <div class="modal-box">
+            <div class="modal-title" style="color:var(--amber)">⛺ New Campsite</div>
+            <div class="modal-sub" id="camp-modal-coords"></div>
+            <div class="modal-fields">
+              <div><label>Site Name *</label><input id="cm-name" placeholder="Smith Island North Beach"></div>
+              <div class="form-grid-3" style="margin:0">
+                <div><label>Type</label><select id="cm-type"><option>Island</option><option>Beach</option><option>Mainland</option><option>Other</option></select></div>
+                <div><label>Access</label><select id="cm-access"><option>Free</option><option>Fee</option><option>Permit</option><option>Private</option></select></div>
+                <div><label>Cost/Night</label><input id="cm-cost" placeholder="$0" value="$0"></div>
+              </div>
+              <div><label>Rating</label><select id="cm-rating"><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></div>
+              <div><label>Notes</label><textarea id="cm-notes" placeholder="Landing quality, water source, hazards…" style="min-height:56px;resize:vertical"></textarea></div>
+              <div class="form-actions">
+                <button class="btn-amber" id="save-camp-btn">Save Site</button>
+                <button class="btn-ghost" id="cancel-camp-btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WEATHER STATION -->
+    <div class="page" id="page-weather">
+      <div class="wx-daytabs" id="wx-daytabs">
+        <span style="color:var(--muted);font-size:11px;padding:8px">Loading forecast…</span>
+      </div>
+      <div class="wx-body">
+        <div class="wx-panel">
+          <div class="wx-slider-wrap">
+            <div class="wx-slider-info">
+              <span>Hour: <b id="wx-hr-label" style="color:var(--text)">08:00</b></span>
+              <span id="wx-bft-label" style="color:var(--green)">Loading…</span>
+            </div>
+            <input type="range" min="0" max="23" value="8" id="wx-hr-slider" style="width:100%">
+            <div class="wx-slider-ticks"><span>00</span><span>03</span><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span><span>23</span></div>
+          </div>
+          <div class="wx-data-scroll" id="wx-data-scroll">
+            <div class="wx-loading" id="wx-loading"><div style="font-size:36px;margin-bottom:10px">🌊</div>Loading marine forecast…</div>
+          </div>
+        </div>
+        <div class="wx-map-wrap">
+          <div id="weather-map" style="width:100%;height:100%"></div>
+          <div class="wx-overlay-controls" id="wx-overlay-controls">
+            <button id="wx-wind-btn" class="wx-overlay-btn active" onclick="toggleWxWind()">🌬 WIND ON</button>
+            <button id="wx-currents-btn" class="wx-overlay-btn" onclick="toggleWxCurrents()">🌊 CURRENTS</button>
+          </div>
+          <div id="wx-day-legend" class="day-legend" style="display:none"></div>
+        </div>
+      </div>
+      <div class="wx-trip-days" id="wx-trip-days" style="display:none">
+        <span class="wx-trip-days-label">TRIP DAYS:</span>
+      </div>
+    </div>
+
+    <!-- GEAR MANAGER -->
+    <div class="page" id="page-gear">
+      <div class="gear-topbar">
+        <div style="font-family:var(--mono);color:var(--muted);font-size:10px;text-transform:uppercase;flex-shrink:0">Packed</div>
+        <div class="gear-packed-count" id="gear-packed-count">0/0</div>
+        <div class="gear-progress-track"><div class="gear-progress-fill" id="gear-bar" style="width:0%"></div></div>
+        <div class="gear-ess-warn" id="gear-ess-warn" style="display:none"></div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button id="gear-edit-toggle" class="btn-ghost" style="font-size:11px;padding:6px 12px">✏ Edit</button>
+          <button id="gear-reset-btn" class="btn-ghost" style="font-size:11px;padding:6px 12px">Reset</button>
+        </div>
+      </div>
+      <div class="gear-cats" id="gear-cats"></div>
+      <div class="gear-body" id="gear-body"></div>
+      <div class="gear-edit-bar" id="gear-edit-bar" style="display:none">
+        <div class="gear-add-form">
+          <input id="gear-new-name" placeholder="New item name…">
+          <select id="gear-new-cat">
+            <option>Safety</option><option>Navigation</option><option>Paddling</option>
+            <option>Clothing</option><option>Camp</option><option>Food</option>
+            <option>First Aid</option><option>Repair</option><option>Other</option>
+          </select>
+          <label class="ess-label"><input type="checkbox" id="gear-new-ess"> Essential</label>
+          <button class="btn-amber" id="gear-add-item-btn" style="padding:7px 16px;flex-shrink:0;white-space:nowrap">Add</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CAMPSITES -->
+    <div class="page" id="page-campsites">
+      <div class="camps-topbar">
+        <div>
+          <div class="camps-title">Island Campsite Database</div>
+          <div class="camps-meta" id="camps-meta">0 sites · 0 free</div>
+        </div>
+        <button class="btn-amber" id="toggle-camp-form">+ Log Site</button>
+      </div>
+      <div class="camps-add-panel" id="camps-add-panel">
+        <div class="form-grid-3">
+          <div class="col-span-2"><label>Site Name *</label><input id="cf-name" placeholder="Smith Island North Beach"></div>
+          <div><label>Rating</label><select id="cf-rating"><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></div>
+          <div><label>Type</label><select id="cf-type"><option>Island</option><option>Beach</option><option>Mainland</option><option>Other</option></select></div>
+          <div><label>Access</label><select id="cf-access"><option>Free</option><option>Fee</option><option>Permit</option><option>Private</option></select></div>
+          <div><label>Cost/Night</label><input id="cf-cost" placeholder="$0" value="$0"></div>
+          <div><label>Latitude</label><input id="cf-lat" placeholder="36.8523"></div>
+          <div><label>Longitude</label><input id="cf-lng" placeholder="-76.012"></div>
+          <div class="col-span-3"><label>Notes</label><textarea id="cf-notes" placeholder="Landing quality, water source, hazards, tide considerations…" style="min-height:52px;resize:vertical"></textarea></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-amber" id="save-camp-form-btn">Save Site</button>
+          <button class="btn-ghost" id="cancel-camp-form-btn">Cancel</button>
+        </div>
+      </div>
+      <div class="camps-filters" id="camps-filters">
+        <button class="filter-btn active" data-filter="All">All</button>
+        <button class="filter-btn" data-filter="Free">Free</button>
+        <button class="filter-btn" data-filter="Fee">Fee</button>
+        <button class="filter-btn" data-filter="Permit">Permit</button>
+        <button class="filter-btn" data-filter="Private">Private</button>
+      </div>
+      <div class="camps-grid-wrap">
+        <div id="camps-grid" class="camps-grid">
+          <div class="empty-state"><div class="empty-icon">⛺</div><div>No sites logged yet</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// STATE & STORAGE
+// ═══════════════════════════════════════════════════════════════
+const DB = {
+  get: k  => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } },
+  set: (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) { if (e.name==='QuotaExceededError') toast('⚠ Storage full — some data may not be saved'); } },
+};
+
+let state = {
+  trips: [],
+  activeTripId: null,
+  campsites: [],
+  gear: [],
+  page: 'dashboard',
+};
+
+function getActiveTrip() { return state.trips.find(t => t.id === state.activeTripId) || null; }
+
+// Weather cache — keyed by "tripId|lat|lng", TTL 10 minutes
+const wxCache = {};
+function wxCacheKey(lat, lng) {
+  const trip = getActiveTrip();
+  return `${trip?.id||'none'}|${lat.toFixed(3)}|${lng.toFixed(3)}`;
+}
+function wxCacheGet(key) {
+  const entry = wxCache[key];
+  if (!entry) return null;
+  if (Date.now() - entry.ts > 10 * 60 * 1000) { delete wxCache[key]; return null; }
+  return entry.data;
+}
+function wxCacheSet(key, data) { wxCache[key] = { ts: Date.now(), data }; }
+
+function load() {
+  state.trips     = DB.get('pp_trips4')    || [];
+  state.campsites = DB.get('pp_camps4')    || [];
+  state.gear      = DB.get('pp_gear4')     || defaultGear();
+  state.activeTripId = state.trips.length ? state.trips[state.trips.length-1].id : null;
+}
+function save() {
+  DB.set('pp_trips4',    state.trips);
+  DB.set('pp_camps4',    state.campsites);
+  DB.set('pp_gear4',     state.gear);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+const BFT_LABELS = ["Calm","Light air","Light breeze","Gentle breeze","Moderate breeze","Fresh breeze","Strong breeze","Near gale","Gale","Severe gale"];
+const WMO = {0:"Clear",1:"Mainly Clear",2:"Partly Cloudy",3:"Overcast",45:"Fog",48:"Freezing Fog",51:"Light Drizzle",53:"Drizzle",55:"Heavy Drizzle",61:"Light Rain",63:"Rain",65:"Heavy Rain",71:"Light Snow",73:"Snow",75:"Heavy Snow",77:"Snow Grains",80:"Rain Showers",81:"Heavy Showers",82:"Violent Showers",85:"Snow Showers",86:"Heavy Snow Showers",95:"Thunderstorm",96:"Thunderstorm w/ Hail",99:"Thunderstorm w/ Heavy Hail"};
+const WDIRS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+const BFT_COLORS = ['#4ade80','#86efac','#a3e635','#fde047','#fb923c','#f97316','#ef4444','#dc2626','#b91c1c','#7f1d1d'];
+
+function mphToBft(mph) {
+  const ms = mph * 0.44704;
+  return ms<0.5?0:ms<1.6?1:ms<3.4?2:ms<5.5?3:ms<8?4:ms<10.8?5:ms<13.9?6:ms<17.2?7:ms<20.8?8:9;
+}
+function bftColor(b) { return BFT_COLORS[Math.min(b,9)]; }
+
+function calcGoNoGo(wind, wave, temp, code) {
+  const b = mphToBft(wind);
+  const fog = code===45||code===48;
+  const storm = code>=95;
+  const rain = code>=80;
+  const checks = [
+    { name:"Wind",       val:`${Math.round(wind)} mph (Bft ${b})`, ok:b<=3, warn:b<=5, detail:BFT_LABELS[b] },
+    { name:"Waves",      val:wave!=null?`${wave.toFixed(1)} m`:"No data", ok:(wave||0)<=0.5, warn:(wave||0)<=1.2, detail:(wave||0)>1.5?"Dangerous":"Manageable" },
+    { name:"Air Temp",   val:`${Math.round(temp)}°F`, ok:temp>=55, warn:temp>=45, detail:temp<45?"Hypothermia risk":"OK" },
+    { name:"Fog/Vis",    val:fog?"⚠ Fog":"Clear", ok:!fog, warn:false, detail:fog?"Use compass/GPS":"Good" },
+    { name:"Conditions", val:storm?"Thunderstorm":rain?"Rain":(WMO[code]||"—"), ok:!storm&&!rain, warn:code>=61, detail:storm?"Dangerous":"OK" },
+  ];
+  const noGo = checks.filter(c=>!c.ok&&!c.warn).length;
+  const caution = checks.filter(c=>!c.ok&&c.warn).length;
+  const overall = noGo>0?"nogo":caution>=2?"caution":"go";
+  return { checks, overall };
+}
+
+function nmBetween(a,b) {
+  const R=6371, dL=(b.lat-a.lat)*Math.PI/180, dN=(b.lng-a.lng)*Math.PI/180;
+  const h=Math.sin(dL/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dN/2)**2;
+  return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h))*0.539957;
+}
+
+function defaultGear() {
+  return [
+    {id:"g1",cat:"Safety",name:"PFD / Life Jacket",ess:true,done:false},
+    {id:"g2",cat:"Safety",name:"Bilge Pump",ess:true,done:false},
+    {id:"g3",cat:"Safety",name:"Paddle Float",ess:true,done:false},
+    {id:"g4",cat:"Safety",name:"Tow Line",ess:true,done:false},
+    {id:"g5",cat:"Safety",name:"VHF Marine Radio",ess:true,done:false},
+    {id:"g6",cat:"Safety",name:"Flares / Signal Mirror",ess:true,done:false},
+    {id:"g7",cat:"Safety",name:"Whistle",ess:true,done:false},
+    {id:"g8",cat:"Safety",name:"Float Plan (filed)",ess:true,done:false},
+    {id:"g9",cat:"Navigation",name:"Compass",ess:true,done:false},
+    {id:"g10",cat:"Navigation",name:"Waterproof Charts",ess:true,done:false},
+    {id:"g11",cat:"Navigation",name:"GPS / Phone in dry bag",ess:true,done:false},
+    {id:"g12",cat:"Navigation",name:"Tide Tables",ess:true,done:false},
+    {id:"g13",cat:"Paddling",name:"Primary Paddle",ess:true,done:false},
+    {id:"g14",cat:"Paddling",name:"Spare Paddle",ess:true,done:false},
+    {id:"g15",cat:"Paddling",name:"Spray Skirt",ess:true,done:false},
+    {id:"g16",cat:"Clothing",name:"Drysuit or Wetsuit",ess:true,done:false},
+    {id:"g17",cat:"Clothing",name:"Paddling Jacket",ess:false,done:false},
+    {id:"g18",cat:"Clothing",name:"Gloves / Pogies",ess:false,done:false},
+    {id:"g19",cat:"Clothing",name:"Neoprene Booties",ess:false,done:false},
+    {id:"g20",cat:"Clothing",name:"Sun Hat",ess:false,done:false},
+    {id:"g21",cat:"Camp",name:"Tent / Bivy",ess:true,done:false},
+    {id:"g22",cat:"Camp",name:"Sleeping Bag",ess:true,done:false},
+    {id:"g23",cat:"Camp",name:"Sleeping Pad",ess:true,done:false},
+    {id:"g24",cat:"Camp",name:"Camp Stove + Fuel",ess:false,done:false},
+    {id:"g25",cat:"Camp",name:"Water Filter",ess:true,done:false},
+    {id:"g26",cat:"Camp",name:"Dry Bags (x6)",ess:true,done:false},
+    {id:"g27",cat:"Camp",name:"Headlamp",ess:true,done:false},
+    {id:"g28",cat:"Food",name:"3-day emergency rations",ess:true,done:false},
+    {id:"g29",cat:"Food",name:"Camp meals",ess:true,done:false},
+    {id:"g30",cat:"Food",name:"Snacks / energy food",ess:true,done:false},
+    {id:"g31",cat:"First Aid",name:"First Aid Kit",ess:true,done:false},
+    {id:"g32",cat:"First Aid",name:"Personal Medications",ess:true,done:false},
+    {id:"g33",cat:"First Aid",name:"Sunscreen SPF 50+",ess:true,done:false},
+    {id:"g34",cat:"Repair",name:"Kayak Repair Kit",ess:true,done:false},
+    {id:"g35",cat:"Repair",name:"Duct Tape",ess:false,done:false},
+  ];
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function toast(msg, dur=2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+function showPage(id) {
+  state.page = id;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelector(`.nav-tab[data-page="${id}"]`).classList.add('active');
+
+  if (id==='route')     { initRouteMap(); setTimeout(()=>routeMap&&routeMap.invalidateSize(),50); }
+  if (id==='weather')   { initWeatherMap(); loadWeather(); setTimeout(()=>weatherMap&&weatherMap.invalidateSize(),50); }
+  if (id==='gear')      renderGear();
+  if (id==='dashboard') renderDashboard();
+  if (id==='campsites') renderCampsites();
+}
+
+document.querySelectorAll('.nav-tab').forEach(btn => {
+  btn.addEventListener('click', () => showPage(btn.dataset.page));
+});
+
+// ═══════════════════════════════════════════════════════════════
+// MAPS — LEAFLET
+// ═══════════════════════════════════════════════════════════════
+let routeMap=null, weatherMap=null;
+let routeMapInit=false, weatherMapInit=false;
+
+// Tile layers
+// Tile layer factory — always returns fresh instances (each map needs its own)
+function makeTiles() {
+  return {
+    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Esri, DigitalGlobe, GeoEye', maxZoom: 19, crossOrigin: true,
+    }),
+    osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors', maxZoom: 19,
+    }),
+    topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenTopoMap', maxZoom: 17,
+    }),
+  };
+}
+function makeSeamark() {
+  return L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+    attribution: '© OpenSeaMap', opacity: 0.85, maxZoom: 18,
+  });
+}
+
+let currentLayer = 'satellite';
+let routePolyline = null;
+let routeMarkers = [];
+let campMarkers  = [];
+let windMarkers  = [];
+let addMode = null;
+let routeTiles = null;
+let routeSeamark = null;
+
+function initRouteMap() {
+  if (routeMapInit) { refreshRouteMap(); routeMap.invalidateSize(); return; }
+  routeMapInit = true;
+  routeMap = L.map('route-map', { zoomControl: false }).setView([36.8, -76.0], 8);
+  routeTiles = makeTiles();
+  routeSeamark = makeSeamark();
+  routeTiles.satellite.addTo(routeMap);
+  routeSeamark.addTo(routeMap);
+  L.control.zoom({ position: 'topright' }).addTo(routeMap);
+
+  routeMap.on('click', e => {
+    if (addMode === 'waypoint') {
+      const trip = getActiveTrip(); if (!trip) return;
+      trip._wpCounter = (trip._wpCounter || 0) + 1;
+      const wp = { lat: e.latlng.lat, lng: e.latlng.lng, name: `WP ${trip._wpCounter}`, id: Date.now() };
+      trip.waypoints.push(wp);
+      save();
+      addMode = null;
+      updateAddBtns();
+      refreshRouteMap();
+      renderSidebar();
+      toast(`📍 Waypoint ${wp.name} placed`);
+    } else if (addMode === 'campsite') {
+      pendingCampLL = { lat: e.latlng.lat, lng: e.latlng.lng };
+      addMode = null;
+      updateAddBtns();
+      showCampModal(pendingCampLL);
+    }
+  });
+
+  // Layer switcher
+  document.querySelectorAll('.layer-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const layer = btn.dataset.layer;
+      if (layer === currentLayer) return;
+      routeMap.removeLayer(routeTiles[currentLayer]);
+      routeTiles[layer].addTo(routeMap);
+      currentLayer = layer;
+      document.querySelectorAll('.layer-btn').forEach(b => b.classList.toggle('active', b.dataset.layer===layer));
+      // Show seamarks on satellite only
+      if (layer==='satellite' && !routeMap.hasLayer(routeSeamark)) routeSeamark.addTo(routeMap);
+      else if (layer!=='satellite' && routeMap.hasLayer(routeSeamark)) routeMap.removeLayer(routeSeamark);
+    });
+  });
+
+  const trip = getActiveTrip();
+  document.getElementById('map-no-trip').style.display = trip ? 'none' : 'flex';
+  refreshRouteMap();
+  renderSidebar();
+  initMapSearch();
+}
+
+function refreshRouteMap() {
+  if (!routeMap) return;
+  const trip = getActiveTrip();
+  document.getElementById('map-no-trip').style.display = trip ? 'none' : 'flex';
+  if (!trip) return;
+
+  // Clear existing
+  routeMarkers.forEach(m => routeMap.removeLayer(m));
+  routeMarkers = [];
+  if (routePolyline) { routeMap.removeLayer(routePolyline); routePolyline = null; }
+  campMarkers.forEach(m => routeMap.removeLayer(m));
+  campMarkers = [];
+
+  const wps = trip.waypoints || [];
+
+  // Route polyline
+  if (wps.length > 1) {
+    routePolyline = L.polyline(wps.map(w=>[w.lat,w.lng]), {
+      color: '#22d3ee', weight: 3, opacity: 0.9, dashArray: '12,6',
+    }).addTo(routeMap);
+  }
+
+  // Waypoint markers
+  wps.forEach((wp, i) => {
+    const isS = i===0, isE = i===wps.length-1;
+    const col = isS?'#4ade80':isE?'#f87171':'#22d3ee';
+    const lbl = isS?'S':isE?'E':String(i);
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:28px;height:28px;background:${col};border:2.5px solid #020c1a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#020c1a;font-family:var(--mono);box-shadow:0 2px 8px rgba(0,0,0,0.5)">${lbl}</div>`,
+      iconSize:[28,28], iconAnchor:[14,14],
+    });
+    const marker = L.marker([wp.lat,wp.lng], {icon}).addTo(routeMap);
+    const popup = L.popup({closeButton:false}).setContent(`
+      <div class="wp-popup-name">${esc(wp.name)}</div>
+      <div class="wp-popup-coords">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</div>
+      <button class="wp-popup-del" onclick="removeWP(${i})">Remove Waypoint</button>
+    `);
+    marker.bindPopup(popup);
+    routeMarkers.push(marker);
+  });
+
+  // Campsite markers — skip if no valid coordinates
+  state.campsites.forEach((c, i) => {
+    if (!c.lat && !c.lng) return; // skip null island
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="width:28px;height:28px;background:#f59e0b;border:2px solid #020c1a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.5)">⛺</div>`,
+      iconSize:[28,28], iconAnchor:[14,14],
+    });
+    const marker = L.marker([c.lat||0, c.lng||0], {icon}).addTo(routeMap);
+    marker.bindPopup(L.popup({closeButton:false}).setContent(`
+      <div class="camp-popup-name">${esc(c.name)}</div>
+      <div class="camp-popup-meta">${c.type} · ${c.access} · ${c.cost}/night ${'★'.repeat(c.rating||3)}</div>
+      ${c.notes?`<div style="color:var(--muted);font-size:10px;margin-bottom:8px">${esc(c.notes)}</div>`:''}
+      <button class="camp-popup-del" onclick="deleteCampsite(${c.id})">Remove</button>
+    `));
+    campMarkers.push(marker);
+  });
+
+  // Fit bounds to route
+  if (wps.length > 0) {
+    const bounds = L.latLngBounds(wps.map(w=>[w.lat,w.lng]));
+    if (wps.length === 1) routeMap.setView([wps[0].lat,wps[0].lng], 10);
+    else routeMap.fitBounds(bounds, { padding: [50,50] });
+  }
+}
+
+let pendingCampLL = null;
+
+function showCampModal(ll) {
+  document.getElementById('camp-modal-coords').textContent = `📍 ${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
+  document.getElementById('camp-modal').style.display = 'flex';
+  document.getElementById('cm-name').focus();
+}
+
+document.getElementById('save-camp-btn').addEventListener('click', () => {
+  const name = document.getElementById('cm-name').value.trim();
+  if (!name) { toast('⚠ Enter a site name'); return; }
+  if (!pendingCampLL) return;
+  const camp = {
+    id: Date.now(),
+    name,
+    lat: pendingCampLL.lat,
+    lng: pendingCampLL.lng,
+    type: document.getElementById('cm-type').value,
+    access: document.getElementById('cm-access').value,
+    cost: document.getElementById('cm-cost').value,
+    rating: +document.getElementById('cm-rating').value,
+    notes: document.getElementById('cm-notes').value,
+  };
+  state.campsites.push(camp);
+  save();
+  closeCampModal();
+  refreshRouteMap();
+  toast(`⛺ ${name} saved`);
+});
+
+document.getElementById('cancel-camp-btn').addEventListener('click', closeCampModal);
+function closeCampModal() {
+  document.getElementById('camp-modal').style.display = 'none';
+  document.getElementById('cm-name').value = '';
+  document.getElementById('cm-notes').value = '';
+  pendingCampLL = null;
+}
+
+function removeWP(i) {
+  const trip = getActiveTrip(); if (!trip) return;
+  const name = trip.waypoints[i]?.name;
+  trip.waypoints.splice(i, 1);
+  save();
+  refreshRouteMap();
+  renderSidebar();
+  renderDashboard();
+  toast(`✕ ${name} removed`);
+}
+window.removeWP = removeWP;
+
+function deleteCampsite(id) {
+  state.campsites = state.campsites.filter(c => c.id !== id);
+  save();
+  refreshRouteMap();
+  renderCampsites();
+  toast('⛺ Campsite removed');
+}
+window.deleteCampsite = deleteCampsite;
+
+// Add mode buttons
+const addWpBtn   = document.getElementById('add-wp-btn');
+const addCampBtn = document.getElementById('add-camp-btn');
+
+addWpBtn.addEventListener('click', () => {
+  if (!getActiveTrip()) { toast('⚠ Select a trip first'); showPage('dashboard'); return; }
+  addMode = addMode==='waypoint' ? null : 'waypoint';
+  updateAddBtns();
+  if (routeMap) routeMap.getContainer().style.cursor = addMode ? 'crosshair' : '';
+});
+addCampBtn.addEventListener('click', () => {
+  if (!getActiveTrip()) { toast('⚠ Select a trip first'); showPage('dashboard'); return; }
+  addMode = addMode==='campsite' ? null : 'campsite';
+  updateAddBtns();
+  if (routeMap) routeMap.getContainer().style.cursor = addMode ? 'crosshair' : '';
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (addMode) {
+      addMode = null;
+      updateAddBtns();
+      if (routeMap) routeMap.getContainer().style.cursor = '';
+      toast('Add mode cancelled');
+    }
+    if (document.getElementById('camp-modal').style.display !== 'none') closeCampModal();
+  }
+});
+
+function updateAddBtns() {
+  addWpBtn.style.background   = addMode==='waypoint' ?'#22d3ee':'var(--bg)';
+  addWpBtn.style.borderColor  = addMode==='waypoint' ?'#22d3ee':'var(--b2)';
+  addWpBtn.style.color        = addMode==='waypoint' ?'var(--bg)':'var(--muted)';
+  addCampBtn.style.background = addMode==='campsite' ?'#f59e0b':'var(--bg)';
+  addCampBtn.style.borderColor= addMode==='campsite' ?'#f59e0b':'var(--b2)';
+  addCampBtn.style.color      = addMode==='campsite' ?'var(--bg)':'var(--muted)';
+}
+
+// Nominatim geocoder for map search
+function initMapSearch() {
+  const input = document.getElementById('map-search-input');
+  const btn   = document.getElementById('map-search-btn');
+  const doSearch = () => {
+    const q = input.value.trim(); if (!q) return;
+    btn.textContent = '…'; btn.disabled = true;
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`, {
+      headers: { 'Accept-Language': 'en', 'User-Agent': 'PaddlePlanner/1.0' }
+    })
+    .then(r => r.json())
+    .then(results => {
+      if (!results.length) { toast('Location not found'); return; }
+      const r = results[0];
+      routeMap.setView([+r.lat, +r.lon], 11);
+      toast(`📍 ${r.display_name.split(',').slice(0,2).join(', ')}`);
+    })
+    .catch(() => toast('⚠ Search failed — check connection'))
+    .finally(() => { btn.textContent = 'GO'; btn.disabled = false; });
+  };
+  btn.addEventListener('click', doSearch);
+  input.addEventListener('keydown', e => { if (e.key==='Enter') doSearch(); });
+}
+
+function renderSidebar() {
+  const trip = getActiveTrip();
+  document.getElementById('sidebar-trip-name').textContent = trip ? trip.name : 'No trip selected';
+  document.getElementById('sidebar-trip-name').style.color = trip ? 'var(--cyan)' : 'var(--dim)';
+  document.getElementById('sidebar-trip-area').textContent = trip?.area || '';
+
+  const wps = trip?.waypoints || [];
+  let totalNm = 0;
+  for (let i=1;i<wps.length;i++) totalNm += nmBetween(wps[i-1],wps[i]);
+
+  const statsEl = document.getElementById('route-stats');
+  if (wps.length > 1) {
+    statsEl.style.display = 'grid';
+    document.getElementById('rt-dist').textContent = totalNm.toFixed(1)+' nm';
+    document.getElementById('rt-days').textContent = '~'+Math.max(1,Math.ceil(totalNm/20));
+  } else { statsEl.style.display = 'none'; }
+
+  // GPX section visibility
+  document.getElementById('gpx-section').style.display = wps.length ? 'block' : 'none';
+  updateGpxDaySelect();
+
+  const list = document.getElementById('wp-list');
+  if (!wps.length) {
+    list.innerHTML = `<div style="color:var(--dim);font-size:11px;text-align:center;padding:20px 0">Press "+ WP" then click the map</div>`;
+    return;
+  }
+
+  // Build trip day options
+  const tripDates = getTripDates(trip);
+  const dayOpts = tripDates.map((d,i) => {
+    const dt = new Date(d+'T12:00:00');
+    return `<option value="${i+1}">Day ${i+1} · ${dt.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'})}</option>`;
+  }).join('');
+  const noDayOpt = `<option value="">—</option>`;
+
+  list.innerHTML = wps.map((wp,i) => {
+    const isS=i===0,isE=i===wps.length-1;
+    const col=isS?'#4ade80':isE?'#f87171':'#22d3ee';
+    const lbl=isS?'S':isE?'E':String(i);
+    const dayLabel = wp.day ? `<span class="wp-day-badge">D${wp.day}</span>` : '';
+    const daySelectHtml = tripDates.length ? `<select class="wp-day-select" onchange="setWpDay(${i},this.value)">
+      ${noDayOpt}${dayOpts}
+    </select>` : '';
+    return `<div class="wp-item" style="flex-wrap:wrap;padding-bottom:8px">
+      <div class="wp-badge" style="background:${col};color:#020c1a">${lbl}</div>
+      <div class="wp-info">
+        <div class="wp-name">${wp.name} ${dayLabel}</div>
+        <div class="wp-coords">${wp.lat.toFixed(4)}, ${wp.lng.toFixed(4)}</div>
+        ${daySelectHtml ? `<div style="margin-top:3px">${daySelectHtml}</div>` : ''}
+      </div>
+      <button class="wp-del" onclick="removeWP(${i})">×</button>
+    </div>`;
+  }).join('');
+
+  // Restore day select values
+  wps.forEach((wp,i) => {
+    const sel = list.querySelectorAll('.wp-day-select')[i];
+    if (sel && wp.day) sel.value = String(wp.day);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WAYPOINT DAY ASSIGNMENT
+// ═══════════════════════════════════════════════════════════════
+function setWpDay(idx, day) {
+  const trip = getActiveTrip(); if (!trip) return;
+  trip.waypoints[idx].day = day ? +day : null;
+  save();
+  refreshRouteMap();
+  toast(day ? `📅 WP assigned to Day ${day}` : '📅 Day assignment cleared');
+}
+window.setWpDay = setWpDay;
+
+// ═══════════════════════════════════════════════════════════════
+// GPX EXPORT
+// ═══════════════════════════════════════════════════════════════
+let gpxExportMode = 'all'; // 'all' or 'day'
+
+function setGpxExportMode(mode) {
+  gpxExportMode = mode;
+  document.getElementById('gpx-opt-all').classList.toggle('active', mode==='all');
+  document.getElementById('gpx-opt-day').classList.toggle('active', mode==='day');
+  document.getElementById('gpx-day-select-wrap').style.display = mode==='day' ? 'block' : 'none';
+}
+window.setGpxExportMode = setGpxExportMode;
+
+function updateGpxDaySelect() {
+  const trip = getActiveTrip();
+  const tripDates = getTripDates(trip);
+  const sel = document.getElementById('gpx-day-select');
+  if (!sel) return;
+  if (!tripDates.length) {
+    sel.innerHTML = '<option value="all">All waypoints</option>';
+    return;
+  }
+  sel.innerHTML = tripDates.map((d,i) => {
+    const dt = new Date(d+'T12:00:00');
+    return `<option value="${i+1}">Day ${i+1} — ${dt.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'})}</option>`;
+  }).join('');
+}
+
+function exportGPX() {
+  const trip = getActiveTrip();
+  if (!trip || !trip.waypoints?.length) { toast('⚠ No waypoints to export'); return; }
+
+  let wps = trip.waypoints;
+  let filename = trip.name.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+
+  if (gpxExportMode === 'day') {
+    const dayNum = +document.getElementById('gpx-day-select').value;
+    wps = wps.filter(w => w.day === dayNum);
+    filename += `_day${dayNum}`;
+    if (!wps.length) { toast(`⚠ No waypoints assigned to Day ${dayNum}`); return; }
+  }
+
+  const now = new Date().toISOString();
+  const trkpts = wps.map(w =>
+    `      <trkpt lat="${w.lat.toFixed(6)}" lon="${w.lng.toFixed(6)}">\n        <name>${esc(w.name)}</name>${w.day ? `\n        <cmt>Day ${w.day}</cmt>` : ''}\n      </trkpt>`
+  ).join('\n');
+  const wptXml = wps.map(w =>
+    `  <wpt lat="${w.lat.toFixed(6)}" lon="${w.lng.toFixed(6)}">\n    <name>${esc(w.name)}</name>${w.day ? `\n    <cmt>Day ${w.day}</cmt>` : ''}\n  </wpt>`
+  ).join('\n');
+
+  const campsiteXml = state.campsites.filter(c=>c.lat&&c.lng).map(c =>
+    `  <wpt lat="${parseFloat(c.lat).toFixed(6)}" lon="${parseFloat(c.lng).toFixed(6)}">\n    <name>${esc(c.name)} (Camp)</name>\n    <sym>Campground</sym>\n  </wpt>`
+  ).join('\n');
+
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Paddle Planner" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <metadata>
+    <name>${esc(trip.name)}</name>
+    <desc>${esc(trip.area||'')} — exported from Paddle Planner</desc>
+    <time>${now}</time>
+  </metadata>
+${wptXml}
+${campsiteXml}
+  <trk>
+    <name>${esc(trip.name)} Route</name>
+    <trkseg>
+${trkpts}
+    </trkseg>
+  </trk>
+</gpx>`;
+
+  const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename+'.gpx';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`⬇ ${filename}.gpx downloaded (${wps.length} waypoints)`);
+}
+window.exportGPX = exportGPX;
+let wxData = null;
+let wxDay = 0;
+let wxHr  = 8;
+let wxShowWind = true;
+let wxTripDayIdx = null;
+
+let wxTiles = null;
+let wxSeamark = null;
+function initWeatherMap() {
+  if (weatherMapInit) return;
+  weatherMapInit = true;
+  weatherMap = L.map('weather-map', { zoomControl: true }).setView([36.8,-76.0], 7);
+  wxTiles = makeTiles();
+  wxSeamark = makeSeamark();
+  wxTiles.satellite.addTo(weatherMap);
+  wxSeamark.addTo(weatherMap);
+  setTimeout(() => weatherMap.invalidateSize(), 100);
+  weatherMap.on('moveend zoomend', () => {
+    if (wxData) renderWxWindArrows();
+  });
+}
+
+function loadWeather(forceRefresh=false) {
+  const trip = getActiveTrip();
+  const lat = trip?.waypoints?.[0]?.lat ?? 36.8;
+  const lng = trip?.waypoints?.[0]?.lng ?? -76.0;
+
+  if (weatherMap) { weatherMap.setView([lat,lng], 7); weatherMap.invalidateSize(); }
+
+  // Use cache if fresh and not forced
+  const cacheKey = wxCacheKey(lat, lng);
+  if (!forceRefresh) {
+    const cached = wxCacheGet(cacheKey);
+    if (cached) {
+      wxData = cached;
+      renderWxDayTabs();
+      renderWxData();
+      renderWxTripDays();
+      renderWxWindArrows();
+      return;
+    }
+  }
+
+  // Parallel fetch: atmosphere + marine
+  const wxUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&hourly=temperature_2m,apparent_temperature,windspeed_10m,winddirection_10m,windgusts_10m,precipitation,weathercode&daily=temperature_2m_max,temperature_2m_min,windspeed_10m_max,windgusts_10m_max,precipitation_sum,sunrise,sunset,weathercode&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&forecast_days=14`;
+  const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&hourly=wave_height,wave_period,wave_direction,wind_wave_height,swell_wave_height&timezone=auto&forecast_days=14`;
+
+  document.getElementById('wx-daytabs').innerHTML = `<span style="color:var(--muted);font-size:11px;padding:8px">Loading forecast…</span>`;
+  document.getElementById('wx-data-scroll').innerHTML = `<div class="wx-loading"><div style="font-size:36px;margin-bottom:10px">🌊</div>Fetching marine forecast…</div>`;
+
+  const wxFetch = fetch(wxUrl).then(r => { if (!r.ok) throw new Error(`Forecast HTTP ${r.status}`); return r.json(); });
+  const marineFetch = fetch(marineUrl).then(r => r.ok ? r.json() : null).catch(() => null);
+
+  Promise.all([wxFetch, marineFetch])
+    .then(([data, marine]) => {
+      if (marine?.hourly?.wave_height) {
+        data.hourly.wave_height      = marine.hourly.wave_height;
+        data.hourly.wave_period      = marine.hourly.wave_period;
+        data.hourly.wave_direction   = marine.hourly.wave_direction;
+        data.hourly.swell_wave_height = marine.hourly.swell_wave_height;
+        data._marineOk = true;
+      }
+      // Use time array to build an index for DST-safe hour lookup
+      data._timeIndex = {};
+      (data.hourly.time || []).forEach((t, i) => { data._timeIndex[t] = i; });
+      wxCacheSet(cacheKey, data);
+      wxData = data;
+      wxDay = 0; wxHr = new Date().getHours();
+      renderWxDayTabs();
+      renderWxData();
+      renderWxTripDays();
+      renderWxWindArrows();
+    })
+    .catch(err => {
+      document.getElementById('wx-data-scroll').innerHTML = `<div class="wx-error">⚠ Weather fetch failed: ${err.message}<br><small>Check your internet connection. Open-Meteo is free and requires no API key.</small></div>`;
+      document.getElementById('wx-daytabs').innerHTML = `<span style="color:var(--red);font-size:11px;padding:8px">Failed to load forecast</span>`;
+    });
+}
+
+function renderWxDayTabs() {
+  if (!wxData) return;
+  const trip = getActiveTrip();
+  const tripDates = getTripDates(trip);
+
+  const tabs = wxData.daily.time.slice(0,14).map((date,i) => {
+    const dt = new Date(date+'T12:00:00');
+    const wind = Math.round(wxData.daily.windspeed_10m_max[i]);
+    const hi = Math.round(wxData.daily.temperature_2m_max[i]);
+    const lo = Math.round(wxData.daily.temperature_2m_min[i]);
+    const b = mphToBft(wind);
+    const isTripDay = tripDates.includes(date);
+    const tripNum = tripDates.indexOf(date)+1;
+    const active = wxDay===i;
+    return `<button class="wx-daytab ${active?'active':''} ${isTripDay?'trip-day':''}" onclick="setWxDay(${i})">
+      ${isTripDay?`<div class="trip-badge">DAY ${tripNum}</div>`:''}
+      <div class="day-name">${dt.toLocaleDateString('en',{weekday:'short'})}</div>
+      <div class="day-date">${dt.toLocaleDateString('en',{month:'short',day:'numeric'})}</div>
+      <div class="day-hi-lo">${hi}°/${lo}°</div>
+      <div class="day-wind" style="color:${active?'inherit':bftColor(b)}">${wind}mph</div>
+    </button>`;
+  }).join('');
+
+  const windToggle = `<div style="margin-left:auto;flex-shrink:0">
+    <button onclick="loadWeather(true)" title="Refresh forecast" style="background:transparent;border:1.5px solid var(--b2);color:var(--muted);border-radius:7px;padding:6px 10px;font-size:11px;margin-right:4px">↻</button>
+  </div>`;
+
+  document.getElementById('wx-daytabs').innerHTML = tabs + windToggle;
+}
+
+// DST-safe hour index: use API time strings not day*24+hr arithmetic
+function getHourIdx(day, hr) {
+  if (!wxData?.hourly?.time) return day*24+hr; // fallback
+  const date = wxData.daily?.time?.[day];
+  if (!date) return day*24+hr;
+  const timeStr = `${date}T${String(hr).padStart(2,'0')}:00`;
+  return wxData._timeIndex?.[timeStr] ?? day*24+hr;
+}
+
+function setWxDay(i) {
+  wxDay = i; wxHr = 8; wxTripDayIdx = null;
+  renderWxDayTabs();
+  renderWxData();
+  renderWxWindArrows();
+  renderWxTripDays();
+}
+
+function toggleWxWind() {
+  wxShowWind = !wxShowWind;
+  renderWxDayTabs();
+  renderWxWindArrows();
+}
+
+function renderWxData() {
+  if (!wxData) return;
+  const scroll = document.getElementById('wx-data-scroll');
+  const slider = document.getElementById('wx-hr-slider');
+  slider.value = wxHr;
+  document.getElementById('wx-hr-label').textContent = `${String(wxHr).padStart(2,'0')}:00`;
+
+  const idx = getHourIdx(wxDay, wxHr);
+  const h = {
+    wind:  wxData.hourly.windspeed_10m[idx]??0,
+    dir:   wxData.hourly.winddirection_10m[idx]??0,
+    gust:  wxData.hourly.windgusts_10m[idx]??0,
+    temp:  wxData.hourly.temperature_2m[idx]??60,
+    feels: wxData.hourly.apparent_temperature[idx]??60,
+    wave:  wxData.hourly.wave_height?.[idx],
+    wper:  wxData.hourly.wave_period?.[idx],
+    rain:  wxData.hourly.precipitation?.[idx]??0,
+    code:  wxData.hourly.weathercode[idx]??0,
+  };
+
+  const b = mphToBft(h.wind);
+  document.getElementById('wx-bft-label').textContent = `${BFT_LABELS[b]} · Bft ${b}`;
+  document.getElementById('wx-bft-label').style.color = bftColor(b);
+
+  const gng = calcGoNoGo(h.wind, h.wave, h.temp, h.code);
+  const gngColors = { go:'var(--green)', caution:'#fde047', nogo:'var(--red)' };
+  const gngLabels = { go:'✓ GO — Conditions Favorable', caution:'⚠ CAUTION — Exercise Judgment', nogo:'✕ NO-GO — Stay Ashore' };
+
+  // Build 24h hours for this day
+  const hours = Array.from({length:24},(_,i)=>{
+    const di = getHourIdx(wxDay, i);
+    return { wind:wxData.hourly.windspeed_10m[di]??0, wave:wxData.hourly.wave_height?.[di] };
+  });
+  const maxWind = Math.max(...hours.map(x=>x.wind), 1);
+  const maxWave = Math.max(...hours.map(x=>x.wave??0), 0.1);
+  const hasWave = hours.some(x=>x.wave!=null);
+
+  const windBars = hours.map((hh,i) => {
+    const ht = Math.max(3,Math.round((hh.wind/maxWind)*48));
+    const active = i===wxHr ? 'active-bar' : '';
+    return `<div class="bar ${active}" style="height:${ht}px;background:${bftColor(mphToBft(hh.wind))}" onclick="setWxHr(${i})" title="${Math.round(hh.wind)}mph"></div>`;
+  }).join('');
+
+  const waveBars = hasWave ? hours.map((hh,i) => {
+    const ht = Math.max(2,Math.round(((hh.wave??0)/maxWave)*32));
+    const active = i===wxHr ? 'active-bar' : '';
+    return `<div class="bar ${active}" style="height:${ht}px;background:#0ea5e9" onclick="setWxHr(${i})" title="${(hh.wave??0).toFixed(1)}m"></div>`;
+  }).join('') : '';
+
+  const tempColor = h.temp<50?'#93c5fd':h.temp>85?'#fb923c':'var(--text)';
+  const waveVal = h.wave!=null ? `${h.wave.toFixed(1)} m` : 'No data';
+  const swell = wxData.hourly.swell_wave_height?.[idx];
+  const waveSub = h.wper ? `${h.wper.toFixed(0)}s period${swell!=null?' · swell '+swell.toFixed(1)+'m':''}` : (h.wave!=null?'wave period unknown':'No marine data');
+
+  const sunrise = wxData.daily.sunrise[wxDay]?.split('T')[1]||'—';
+  const sunset  = wxData.daily.sunset[wxDay]?.split('T')[1]||'—';
+
+  const dayHi = Math.round(wxData.daily.temperature_2m_max[wxDay]);
+  const dayLo = Math.round(wxData.daily.temperature_2m_min[wxDay]);
+  const dayRain = wxData.daily.precipitation_sum[wxDay]?.toFixed(1);
+
+  scroll.innerHTML = `
+    <div class="gng-full ${gng.overall}">
+      <div class="gng-full-status" style="color:${gngColors[gng.overall]}">${gngLabels[gng.overall]}</div>
+      ${gng.checks.map(c=>`<div class="gng-row">
+        <span class="gng-icon" style="color:${c.ok?'var(--green)':c.warn?'#fde047':'var(--red)'}">${c.ok?'●':c.warn?'▲':'✕'}</span>
+        <span class="gng-name">${c.name}</span>
+        <span class="gng-val">${c.val}</span>
+      </div>`).join('')}
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="stat-label">Wind Speed</div>
+        <div class="stat-val" style="color:${bftColor(b)}">${Math.round(h.wind)} mph</div>
+        <div class="stat-sub">Gusts ${Math.round(h.gust)} mph</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Direction</div>
+        <div class="stat-val">${WDIRS[Math.round(h.dir/22.5)%16]}</div>
+        <div class="stat-sub">${Math.round(h.dir)}° true</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Air Temp</div>
+        <div class="stat-val" style="color:${tempColor}">${Math.round(h.temp)}°F</div>
+        <div class="stat-sub">Feels ${Math.round(h.feels)}°F</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Wave Height</div>
+        <div class="stat-val" style="color:var(--cyan)">${waveVal}</div>
+        <div class="stat-sub">${waveSub}</div>
+        <div style="font-size:8px;color:var(--dim);margin-top:2px">${wxData._marineOk?'Marine API':'Atm. model'}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Conditions</div>
+        <div class="stat-val" style="font-size:12px;font-weight:700;color:${h.code>=80?'var(--red)':'var(--text)'}">${WMO[h.code]||'—'}</div>
+        <div class="stat-sub">${h.rain>0?h.rain.toFixed(1)+' mm rain':'Dry'}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Beaufort</div>
+        <div class="stat-val" style="color:${bftColor(b)}">Bft ${b}</div>
+        <div class="stat-sub">${BFT_LABELS[b]}</div>
+      </div>
+    </div>
+
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--muted)">
+      📅 Day: <b style="color:var(--text)">${dayHi}°F / ${dayLo}°F</b>
+      &nbsp;·&nbsp; 🌅 ${sunrise} &nbsp;·&nbsp; 🌇 ${sunset}
+      ${dayRain>0?`&nbsp;·&nbsp; 🌧 ${dayRain}mm`:''}
+    </div>
+
+    <div class="bar-chart">
+      <div class="bar-chart-label">24-Hour Wind (mph)</div>
+      <div class="bars" style="height:52px">${windBars}</div>
+      <div class="bar-ticks"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+    </div>
+
+    ${hasWave?`<div class="bar-chart">
+      <div class="bar-chart-label">Wave Height (m)</div>
+      <div class="bars" style="height:36px">${waveBars}</div>
+      <div class="bar-ticks"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+    </div>`:''}
+  `;
+}
+
+function setWxHr(hr) {
+  wxHr = hr;
+  renderWxData();
+  renderWxWindArrows();
+}
+window.setWxHr = setWxHr;
+window.setWxDay = setWxDay;
+
+let _sliderRaf = null;
+document.getElementById('wx-hr-slider').addEventListener('input', e => {
+  const hr = +e.target.value;
+  wxHr = hr;
+  document.getElementById('wx-hr-label').textContent = `${String(hr).padStart(2,'0')}:00`;
+  if (_sliderRaf) cancelAnimationFrame(_sliderRaf);
+  _sliderRaf = requestAnimationFrame(() => { setWxHr(hr); _sliderRaf = null; });
+});
+
+let wxShowCurrents = false;
+
+function toggleWxWind() {
+  wxShowWind = !wxShowWind;
+  const btn = document.getElementById('wx-wind-btn');
+  btn.classList.toggle('active', wxShowWind);
+  btn.textContent = wxShowWind ? '🌬 WIND ON' : '🌬 WIND OFF';
+  renderWxDayTabs();
+  renderWxWindArrows();
+}
+
+function toggleWxCurrents() {
+  wxShowCurrents = !wxShowCurrents;
+  const btn = document.getElementById('wx-currents-btn');
+  btn.classList.toggle('currents-active', wxShowCurrents);
+  btn.textContent = wxShowCurrents ? '🌊 CURRENTS ON' : '🌊 CURRENTS';
+  renderWxWindArrows();
+}
+window.toggleWxCurrents = toggleWxCurrents;
+window.toggleWxWind = toggleWxWind;
+
+function renderWxWindArrows() {
+  if (!weatherMap || !wxData) return;
+  windMarkers.forEach(m => weatherMap.removeLayer(m));
+  windMarkers = [];
+
+  const trip = getActiveTrip();
+  const wps = trip?.waypoints || [];
+  const idx = getHourIdx(wxDay, wxHr);
+  const wind = wxData.hourly.windspeed_10m[idx]??0;
+  const dir  = wxData.hourly.winddirection_10m[idx]??0;
+  const b = mphToBft(wind);
+  const col = bftColor(b);
+
+  // DAY-COLORED ROUTE: color segments by assigned day
+  const DAY_COLORS = ['#22d3ee','#f59e0b','#4ade80','#f87171','#a78bfa','#fb923c','#34d399','#e879f9','#60a5fa','#fbbf24'];
+  const tripDates = getTripDates(trip);
+
+  if (wps.length > 1) {
+    // Draw route segments colored by day assignment
+    let segs = [];
+    for (let i = 0; i < wps.length - 1; i++) {
+      const wpA = wps[i], wpB = wps[i+1];
+      const dayA = wpA.day, dayB = wpB.day;
+      const segDay = dayA || dayB || null;
+      const segColor = segDay ? DAY_COLORS[(segDay-1) % DAY_COLORS.length] : '#22d3ee';
+      // Dim if not matching currently selected trip day (if one is selected)
+      const opacity = wxTripDayIdx !== null && segDay !== (wxTripDayIdx+1) ? 0.25 : 0.9;
+      windMarkers.push(L.polyline([[wpA.lat,wpA.lng],[wpB.lat,wpB.lng]],{
+        color: segColor, weight: 3, opacity, dashArray: '10,5', interactive: false
+      }).addTo(weatherMap));
+    }
+
+    // Day legend
+    if (tripDates.length) {
+      const usedDays = [...new Set(wps.map(w=>w.day).filter(Boolean))].sort((a,b)=>a-b);
+      if (usedDays.length) {
+        const legendEl = document.getElementById('wx-day-legend');
+        legendEl.style.display = 'block';
+        legendEl.innerHTML = `<div class="day-legend-title">Route Days</div>` +
+          usedDays.map(d => {
+            const dt = new Date((tripDates[d-1]||tripDates[0])+'T12:00:00');
+            return `<div class="day-legend-item">
+              <div class="day-legend-swatch" style="background:${DAY_COLORS[(d-1)%DAY_COLORS.length]}"></div>
+              <span style="color:${DAY_COLORS[(d-1)%DAY_COLORS.length]}">D${d}</span>
+              <span style="color:var(--muted);font-size:9px">${dt.toLocaleDateString('en',{month:'short',day:'numeric'})}</span>
+            </div>`;
+          }).join('');
+      } else {
+        document.getElementById('wx-day-legend').style.display = 'none';
+      }
+    }
+  } else {
+    document.getElementById('wx-day-legend').style.display = 'none';
+  }
+
+  // Waypoint markers on weather map
+  wps.forEach((wp,i) => {
+    const isS=i===0,isE=i===wps.length-1;
+    const col2=isS?'#4ade80':isE?'#f87171':'#22d3ee';
+    const lbl=isS?'S':isE?'E':String(i);
+    const dimmed = wxTripDayIdx !== null && wp.day && wp.day !== (wxTripDayIdx+1);
+    const opacity = dimmed ? 0.3 : 1;
+    const icon2 = L.divIcon({
+      className:'',
+      html:`<div style="width:20px;height:20px;background:${col2};border:2px solid #020c1a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#020c1a;font-family:var(--mono);opacity:${opacity}">${lbl}</div>`,
+      iconSize:[20,20],iconAnchor:[10,10],
+    });
+    windMarkers.push(L.marker([wp.lat,wp.lng],{icon:icon2,interactive:false}).addTo(weatherMap));
+  });
+
+  // WIND ARROWS — on a grid across visible map bounds + at waypoints
+  if (wxShowWind && wps.length) {
+    const bounds = weatherMap.getBounds();
+    const minLat = bounds.getSouth(), maxLat = bounds.getNorth();
+    const minLng = bounds.getWest(),  maxLng = bounds.getEast();
+    const gridStepLat = (maxLat - minLat) / 5;
+    const gridStepLng = (maxLng - minLng) / 6;
+
+    // Grid points
+    const gridPts = [];
+    for (let lat = minLat + gridStepLat*0.5; lat < maxLat; lat += gridStepLat) {
+      for (let lng = minLng + gridStepLng*0.5; lng < maxLng; lng += gridStepLng) {
+        gridPts.push({ lat, lng });
+      }
+    }
+
+    // Add waypoints as extra wind arrow locations
+    wps.forEach(wp => gridPts.push({ lat: wp.lat, lng: wp.lng, isWP: true }));
+
+    gridPts.forEach(pt => {
+      const icon = L.divIcon({
+        className:'',
+        html: buildWindArrowSVG(dir, wind, col, pt.isWP),
+        iconSize:[48,48], iconAnchor:[24,24],
+      });
+      windMarkers.push(L.marker([pt.lat,pt.lng],{icon,interactive:false}).addTo(weatherMap));
+    });
+  }
+
+  // CURRENTS OVERLAY — simulated tidal current arrows
+  if (wxShowCurrents && wps.length) {
+    const bounds = weatherMap.getBounds();
+    const minLat = bounds.getSouth(), maxLat = bounds.getNorth();
+    const minLng = bounds.getWest(),  maxLng = bounds.getEast();
+    const gridStepLat = (maxLat - minLat) / 7;
+    const gridStepLng = (maxLng - minLng) / 8;
+
+    // Tidal current direction cycles with hour (approximation)
+    // Direction changes ~6hrs flood, ~6hrs ebb
+    const tidalPhase = (wxHr % 12) / 12; // 0–1
+    const isFlood = wxHr % 12 < 6;
+    const baseDir = isFlood ? 45 : 225; // NE flood, SW ebb
+    const speed = 0.5 + Math.abs(Math.sin(tidalPhase * Math.PI)) * 1.5; // 0.5–2 knots
+    const currentCol = '#a78bfa';
+
+    for (let lat = minLat + gridStepLat*0.5; lat < maxLat; lat += gridStepLat) {
+      for (let lng = minLng + gridStepLng*0.5; lng < maxLng; lng += gridStepLng) {
+        const jitter = (Math.sin(lat*47+lng*31) * 20); // pseudo-random local variation
+        const localDir = (baseDir + jitter + 360) % 360;
+        const icon = L.divIcon({
+          className:'',
+          html: buildCurrentArrowSVG(localDir, speed, currentCol),
+          iconSize:[40,40], iconAnchor:[20,20],
+        });
+        windMarkers.push(L.marker([lat,lng],{icon,interactive:false}).addTo(weatherMap));
+      }
+    }
+  }
+}
+
+function buildWindArrowSVG(dir, speed, col, large=false) {
+  const size = large ? 60 : 48;
+  const half = size / 2;
+  const len = large ? 18 : 14;
+  const r = dir*Math.PI/180;
+  const sx=Math.sin(r)*len, sy=-Math.cos(r)*len;
+  const tx=half-sx, ty=half-sy, bx=half+sx, by=half+sy;
+  const headSize = large ? 0.4 : 0.35;
+  const px1=tx+sy*headSize, py1=ty-sx*headSize;
+  const px2=tx-sy*headSize, py2=ty+sx*headSize;
+  const fontSize = large ? 10 : 8;
+  return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+    <line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="${large?3:2}" stroke-linecap="round" opacity="0.9"/>
+    <polygon points="${tx},${ty} ${px1},${py1} ${px2},${py2}" fill="${col}" opacity="0.9"/>
+    <text x="${half}" y="${size-3}" text-anchor="middle" fill="${col}" font-size="${fontSize}" font-weight="bold" font-family="monospace" stroke="black" stroke-width="2.5" paint-order="stroke">${Math.round(speed)}</text>
+  </svg>`;
+}
+
+function buildCurrentArrowSVG(dir, speed, col) {
+  const size = 40, half = 20, len = 12;
+  const r = dir*Math.PI/180;
+  const sx=Math.sin(r)*len, sy=-Math.cos(r)*len;
+  const tx=half-sx, ty=half-sy, bx=half+sx, by=half+sy;
+  const px1=tx+sy*0.3, py1=ty-sx*0.3;
+  const px2=tx-sy*0.3, py2=ty+sx*0.3;
+  return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+    <line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-dasharray="4,2" opacity="0.7"/>
+    <polygon points="${tx},${ty} ${px1},${py1} ${px2},${py2}" fill="${col}" opacity="0.7"/>
+    <text x="${half}" y="${size-1}" text-anchor="middle" fill="${col}" font-size="7" font-weight="bold" font-family="monospace" stroke="black" stroke-width="2" paint-order="stroke">${speed.toFixed(1)}kt</text>
+  </svg>`;
+}
+
+function getTripDates(trip) {
+  if (!trip?.startDate) return [];
+  const start = new Date(trip.startDate+'T00:00:00');
+  const end   = trip.endDate ? new Date(trip.endDate+'T00:00:00') : new Date(start.getTime()+6*86400000);
+  const dates = [];
+  for (let d=new Date(start); d<=end; d=new Date(d.getTime()+86400000))
+    dates.push(d.toISOString().split('T')[0]);
+  return dates;
+}
+
+function renderWxTripDays() {
+  const trip = getActiveTrip();
+  const tripDates = getTripDates(trip);
+  const container = document.getElementById('wx-trip-days');
+  if (!tripDates.length || !wxData) { container.style.display='none'; return; }
+  container.style.display = 'flex';
+
+  const allDates = wxData.daily.time;
+  let html = `<span class="wx-trip-days-label">TRIP DAYS:</span>
+    <button class="trip-day-btn all-btn ${wxTripDayIdx===null?'active':''}" onclick="setWxTripDay(null)">All</button>`;
+
+  tripDates.forEach((date,i) => {
+    const fIdx = allDates.indexOf(date);
+    const inRange = fIdx>=0;
+    const dt = new Date(date+'T12:00:00');
+    const wind = inRange ? Math.round(wxData.daily.windspeed_10m_max[fIdx]) : null;
+    const b = wind!=null ? mphToBft(wind) : 0;
+    const active = wxTripDayIdx===i;
+    html += `<button class="trip-day-btn ${active?'active':''} ${!inRange?'out-of-range':''}"
+      onclick="${inRange?`setWxTripDay(${i},${fIdx})`:'void(0)'}">
+      <b>Day ${i+1}</b>
+      <span style="margin-left:6px;opacity:0.7;font-size:10px">${dt.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'})}</span>
+      ${wind!=null?`<span style="margin-left:5px;color:${active?'inherit':bftColor(b)};font-size:10px;font-family:var(--mono)">${wind}mph</span>`:'<span style="font-size:9px;opacity:0.4;margin-left:4px">(beyond forecast)</span>'}
+    </button>`;
+  });
+
+  if (wxTripDayIdx!==null) {
+    const date = tripDates[wxTripDayIdx];
+    const dt = new Date(date+'T12:00:00');
+    html += `<div style="margin-left:auto;color:var(--muted);font-size:11px;flex-shrink:0">Viewing: <b style="color:var(--amber)">Day ${wxTripDayIdx+1}</b> · ${dt.toLocaleDateString('en',{weekday:'long',month:'long',day:'numeric'})}</div>`;
+  }
+  container.innerHTML = html;
+}
+
+function setWxTripDay(idx, forecastIdx) {
+  wxTripDayIdx = idx;
+  if (idx!==null && forecastIdx!==undefined) { wxDay=forecastIdx; wxHr=8; }
+  renderWxDayTabs();
+  renderWxData();
+  renderWxWindArrows();
+  renderWxTripDays();
+}
+window.setWxTripDay = setWxTripDay;
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function renderDashboard() {
+  const trip = getActiveTrip();
+  renderNavTripPicker();
+
+  if (!trip) {
+    document.getElementById('dash-trip-name').textContent = 'Paddle Planner';
+    document.getElementById('dash-trip-sub').textContent = 'Create a trip below to start planning';
+    document.getElementById('dash-active').style.display = 'none';
+  } else {
+    document.getElementById('dash-trip-name').textContent = trip.name;
+    document.getElementById('dash-trip-sub').textContent = trip.area || 'Your expedition is taking shape';
+    document.getElementById('dash-active').style.display = 'block';
+    renderReadiness(trip);
+    loadDashWeather(trip);
+    renderQuickStats(trip);
+  }
+  renderTripList();
+}
+
+function renderNavTripPicker() {
+  const sel = document.getElementById('nav-trip-picker');
+  const wrap = document.getElementById('nav-trip-select');
+  wrap.style.display = state.trips.length ? 'flex' : 'none';
+  sel.innerHTML = state.trips.map(t => `<option value="${t.id}" ${t.id===state.activeTripId?'selected':''}>${t.name}</option>`).join('');
+}
+document.getElementById('nav-trip-picker').addEventListener('change', e => {
+  // Keep IDs as-is; trips use Date.now() numbers, compare with ==
+  const raw = e.target.value; state.activeTripId = isNaN(raw) ? raw : +raw;
+  renderDashboard();
+  if (routeMapInit) refreshRouteMap(), renderSidebar();
+  if (weatherMapInit) loadWeather();
+});
+
+function renderReadiness(trip) {
+  const wps = trip.waypoints||[];
+  let totalNm=0;
+  for(let i=1;i<wps.length;i++) totalNm+=nmBetween(wps[i-1],wps[i]);
+  const gear = state.gear;
+  const essLeft = gear.filter(g=>g.ess&&!g.done).length;
+  const checks = [
+    { label:'Route planned (2+ waypoints)', done: wps.length>=2 },
+    { label:'Campsite identified',           done: state.campsites.length>0 },
+    { label:'Essential gear packed',         done: essLeft===0 && gear.length>0 },
+    { label:'Departure date set',            done: !!trip.startDate },
+    { label:'Float plan filed',              done: gear.find(g=>g.name?.includes('Float'))?.done||false },
+  ];
+  const pct = Math.round(checks.filter(c=>c.done).length/checks.length*100);
+  const col = pct===100?'var(--green)':pct>=60?'var(--amber)':'var(--red)';
+  document.getElementById('dash-pct').textContent = pct+'%';
+  document.getElementById('dash-pct').style.color = col;
+  document.getElementById('dash-bar').style.width = pct+'%';
+  document.getElementById('dash-bar').style.background = col;
+  document.getElementById('dash-checks').innerHTML = checks.map(c=>`
+    <div class="check-item">
+      <span class="check-dot" style="color:${c.done?'var(--green)':'var(--dim)'}">${c.done?'✓':'○'}</span>
+      <span style="color:${c.done?'var(--text)':'var(--muted)'}">${c.label}</span>
+    </div>`).join('');
+}
+
+let _lastDashWxLoad = 0;
+let _lastDashWxTrip = null;
+function loadDashWeather(trip) {
+  const now = Date.now();
+  if (trip.id === _lastDashWxTrip && now - _lastDashWxLoad < 2*60*1000) return;
+  _lastDashWxLoad = now;
+  _lastDashWxTrip = trip.id;
+  const lat = trip.waypoints?.[0]?.lat??36.8;
+  const lng = trip.waypoints?.[0]?.lng??-76.0;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&hourly=windspeed_10m,winddirection_10m,weathercode,temperature_2m&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&forecast_days=1`;
+  const marUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&hourly=wave_height&timezone=auto&forecast_days=1`;
+  const p1 = fetch(url).then(r=>r.json());
+  const p2 = fetch(marUrl).then(r=>r.ok?r.json():null).catch(()=>null);
+  Promise.all([p1,p2]).then(([d,marine])=>{
+    const hr = new Date().getHours();
+    const wind = d.hourly.windspeed_10m?.[hr]??0;
+    const wave = marine?.hourly?.wave_height?.[hr] ?? null;
+    const temp = d.hourly.temperature_2m?.[hr]??60;
+    const code = d.hourly.weathercode?.[hr]??0;
+    const gng = calcGoNoGo(wind,wave,temp,code);
+    const el = document.getElementById('dash-gng');
+    el.className = `gng-card ${gng.overall}`;
+    const gngLabels = {go:'✓ GO — Conditions Favorable',caution:'⚠ CAUTION',nogo:'✕ NO-GO — Stay Ashore'};
+    const gngColors = {go:'var(--green)',caution:'#fde047',nogo:'var(--red)'};
+    document.getElementById('dash-gng-status').textContent = gngLabels[gng.overall];
+    document.getElementById('dash-gng-status').style.color = gngColors[gng.overall];
+    document.getElementById('dash-gng-rows').innerHTML = gng.checks.map(c=>`
+      <div class="gng-row">
+        <span class="gng-icon" style="color:${c.ok?'var(--green)':c.warn?'#fde047':'var(--red)'}">${c.ok?'●':c.warn?'▲':'✕'}</span>
+        <span class="gng-name">${c.name}</span>
+        <span class="gng-val">${c.val}</span>
+      </div>`).join('');
+  }).catch(()=>{
+    document.getElementById('dash-gng-status').textContent = 'Weather unavailable';
+  });
+}
+
+
+function renderQuickStats(trip) {
+  const wps = trip.waypoints||[];
+  let totalNm=0;
+  for(let i=1;i<wps.length;i++) totalNm+=nmBetween(wps[i-1],wps[i]);
+  const gear = state.gear;
+  const done = gear.filter(g=>g.done).length;
+  const essLeft = gear.filter(g=>g.ess&&!g.done).length;
+  const free = state.campsites.filter(c=>c.access==='Free').length;
+
+  document.getElementById('qs-dist').textContent = wps.length>1?`${totalNm.toFixed(1)} nm`:'—';
+  document.getElementById('qs-dist-sub').textContent = wps.length>1?`~${Math.max(1,Math.ceil(totalNm/20))} days`:'';
+  document.getElementById('qs-gear').textContent = `${done}/${gear.length}`;
+  document.getElementById('qs-gear-sub').textContent = essLeft>0?`${essLeft} essential remaining`:'';
+  document.getElementById('qs-camps').textContent = state.campsites.length;
+  document.getElementById('qs-camps-sub').textContent = free>0?`${free} free sites`:'';
+}
+
+function renderTripList() {
+  const list = document.getElementById('trip-list');
+  if (!state.trips.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🛶</div><div>No trips yet — create one above</div></div>`;
+    return;
+  }
+  list.innerHTML = state.trips.map(t=>`
+    <div class="trip-card ${t.id===state.activeTripId?'active':''}" onclick="selectTrip(${JSON.stringify(t.id)})">
+      <div class="trip-card-top">
+        <div>
+          <div class="trip-card-name" style="color:${t.id===state.activeTripId?'var(--cyan)':'var(--text)'}">${t.name}</div>
+          ${t.area?`<div class="trip-card-meta">${t.area}</div>`:''}
+          ${t.startDate?`<div class="trip-card-dates">${t.startDate}${t.endDate?' → '+t.endDate:''}</div>`:''}
+          <div class="trip-card-meta" style="margin-top:3px">${(t.waypoints||[]).length} waypoints</div>
+        </div>
+        <button class="trip-del" onclick="event.stopPropagation();deleteTrip(${JSON.stringify(t.id)})">×</button>
+      </div>
+    </div>`).join('');
+}
+
+function selectTrip(id) {
+  state.activeTripId = id;
+  renderDashboard();
+  if (routeMapInit) refreshRouteMap(), renderSidebar();
+  if (weatherMapInit) loadWeather();
+}
+window.selectTrip = selectTrip;
+
+function deleteTrip(id) {
+  if (!confirm('Delete this trip?')) return;
+  state.trips = state.trips.filter(t=>t.id!==id);
+  if (state.activeTripId===id) state.activeTripId = state.trips[state.trips.length-1]?.id||null;
+  save();
+  renderDashboard();
+  if (routeMapInit) refreshRouteMap(), renderSidebar();
+}
+window.deleteTrip = deleteTrip;
+
+// New trip form
+document.getElementById('toggle-new-trip-form').addEventListener('click', () => {
+  const f = document.getElementById('new-trip-form');
+  f.style.display = f.style.display==='none' ? 'block' : 'none';
+});
+document.getElementById('cancel-trip-form').addEventListener('click', () => {
+  document.getElementById('new-trip-form').style.display = 'none';
+});
+document.getElementById('create-trip-btn').addEventListener('click', () => {
+  const name = document.getElementById('nf-name').value.trim();
+  if (!name) { toast('⚠ Trip name required'); return; }
+  const trip = {
+    id: Date.now(),
+    name,
+    area:      document.getElementById('nf-area').value.trim(),
+    startDate: document.getElementById('nf-start').value,
+    endDate:   document.getElementById('nf-end').value,
+    notes:     document.getElementById('nf-notes').value,
+    waypoints: [],
+    createdAt: new Date().toISOString(),
+  };
+  state.trips.push(trip);
+  state.activeTripId = trip.id;
+  save();
+  document.getElementById('new-trip-form').style.display = 'none';
+  ['nf-name','nf-area','nf-start','nf-end','nf-notes'].forEach(id=>document.getElementById(id).value='');
+  renderDashboard();
+  toast(`🛶 ${trip.name} created!`);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// GEAR MANAGER
+// ═══════════════════════════════════════════════════════════════
+let gearCat = 'All';
+let gearEditing = false;
+
+function renderGear() {
+  const gear = state.gear;
+  const done = gear.filter(g=>g.done).length;
+  const essLeft = gear.filter(g=>g.ess&&!g.done).length;
+  const pct = gear.length ? done/gear.length*100 : 0;
+
+  document.getElementById('gear-packed-count').textContent = `${done}/${gear.length}`;
+  document.getElementById('gear-bar').style.width = pct+'%';
+  const warn = document.getElementById('gear-ess-warn');
+  if (essLeft>0) { warn.style.display='block'; warn.textContent=`⚠ ${essLeft} essential left`; }
+  else warn.style.display='none';
+
+  // Category tabs
+  const cats = ['All',...new Set(gear.map(g=>g.cat))];
+  document.getElementById('gear-cats').innerHTML = cats.map(c=>
+    `<button class="cat-btn ${gearCat===c?'active':''}" onclick="setGearCat('${c}')">${c}</button>`
+  ).join('');
+
+  // Items
+  const shown = gearCat==='All' ? gear : gear.filter(g=>g.cat===gearCat);
+  const byCat = [...new Set(shown.map(g=>g.cat))];
+  document.getElementById('gear-body').innerHTML = byCat.map(cat => {
+    const items = shown.filter(g=>g.cat===cat);
+    const catDone = items.filter(g=>g.done).length;
+    return `<div class="gear-cat-header">
+        <div class="gear-cat-name">${cat}</div>
+        <div class="gear-cat-count" style="background:${catDone===items.length?'var(--green)':'var(--border)'};color:${catDone===items.length?'var(--bg)':'var(--muted)'}">${catDone}/${items.length}</div>
+      </div>
+      ${items.map(g=>`<div class="gear-item">
+        <div class="gear-check ${g.done?'checked':''}" onclick="toggleGear('${g.id}')">
+          ${g.done?'<span style="color:var(--bg);font-size:11px;font-weight:800">✓</span>':''}
+        </div>
+        <span class="gear-item-name ${g.done?'done':''}" onclick="toggleGear('${g.id}')">
+          ${g.name}${g.ess&&!g.done?'<span class="gear-ess-tag">● ESS</span>':''}
+        </span>
+        ${gearEditing?`<button class="gear-del" onclick="deleteGearItem('${g.id}')">×</button>`:''}
+      </div>`).join('')}`;
+  }).join('');
+}
+
+function setGearCat(c) { gearCat=c; renderGear(); }
+window.setGearCat = setGearCat;
+
+function toggleGear(id) {
+  const item = state.gear.find(g=>g.id===id);
+  if (item) { item.done=!item.done; save(); renderGear(); }
+}
+window.toggleGear = toggleGear;
+
+function deleteGearItem(id) {
+  state.gear = state.gear.filter(g=>g.id!==id);
+  save(); renderGear();
+}
+window.deleteGearItem = deleteGearItem;
+
+document.getElementById('gear-edit-toggle').addEventListener('click', () => {
+  gearEditing = !gearEditing;
+  const btn = document.getElementById('gear-edit-toggle');
+  btn.textContent = gearEditing ? '✓ Done' : '✏ Edit';
+  btn.style.background = gearEditing ? 'var(--amber)' : 'transparent';
+  btn.style.borderColor = gearEditing ? 'var(--amber)' : 'var(--b2)';
+  btn.style.color = gearEditing ? 'var(--bg)' : 'var(--muted)';
+  document.getElementById('gear-edit-bar').style.display = gearEditing ? 'flex' : 'none';
+  renderGear();
+});
+
+document.getElementById('gear-reset-btn').addEventListener('click', () => {
+  if (!confirm('Reset all gear to unchecked?')) return;
+  state.gear.forEach(g=>g.done=false);
+  save(); renderGear();
+});
+
+document.getElementById('gear-add-item-btn').addEventListener('click', () => {
+  const name = document.getElementById('gear-new-name').value.trim();
+  if (!name) return;
+  state.gear.push({
+    id: 'c'+Date.now(),
+    cat: document.getElementById('gear-new-cat').value,
+    name,
+    ess: document.getElementById('gear-new-ess').checked,
+    done: false,
+  });
+  document.getElementById('gear-new-name').value = '';
+  document.getElementById('gear-new-ess').checked = false;
+  save(); renderGear();
+  toast(`✓ ${name} added`);
+});
+document.getElementById('gear-new-name').addEventListener('keydown', e => {
+  if (e.key==='Enter') document.getElementById('gear-add-item-btn').click();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// CAMPSITES
+// ═══════════════════════════════════════════════════════════════
+let campFilter = 'All';
+
+function renderCampsites() {
+  const camps = campFilter==='All' ? state.campsites : state.campsites.filter(c=>c.access===campFilter);
+  const free = state.campsites.filter(c=>c.access==='Free').length;
+  document.getElementById('camps-meta').textContent = `${state.campsites.length} sites · ${free} free`;
+
+  if (!camps.length) {
+    document.getElementById('camps-grid').innerHTML = `<div class="empty-state"><div class="empty-icon">⛺</div><div>No campsites logged yet</div></div>`;
+    return;
+  }
+  document.getElementById('camps-grid').innerHTML = camps.map(c=>`
+    <div class="camp-card">
+      <div class="camp-card-top">
+        <div>
+          <div class="camp-name">${c.name}</div>
+          <div class="camp-type-coords">${c.type}${c.lat?` · ${parseFloat(c.lat).toFixed(4)}, ${parseFloat(c.lng).toFixed(4)}`:''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${c.rating?`<span class="camp-rating">${'★'.repeat(c.rating)}</span>`:''}
+          <button class="camp-del" onclick="deleteCampsite(${c.id})">×</button>
+        </div>
+      </div>
+      <div class="camp-tags">
+        <span class="camp-tag ${c.access?.toLowerCase()}">${c.access||'Free'}</span>
+        <span class="camp-tag cost">${c.cost||'$0'}/night</span>
+      </div>
+      ${c.notes?`<div class="camp-notes">${c.notes}</div>`:''}
+    </div>`).join('');
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    campFilter = btn.dataset.filter;
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===campFilter));
+    renderCampsites();
+  });
+});
+
+document.getElementById('toggle-camp-form').addEventListener('click', () => {
+  const p = document.getElementById('camps-add-panel');
+  p.classList.toggle('open');
+  if (p.classList.contains('open')) document.getElementById('cf-name').focus();
+});
+document.getElementById('cancel-camp-form-btn').addEventListener('click', () => {
+  document.getElementById('camps-add-panel').classList.remove('open');
+});
+document.getElementById('save-camp-form-btn').addEventListener('click', () => {
+  const name = document.getElementById('cf-name').value.trim();
+  if (!name) { toast('⚠ Site name required'); return; }
+  state.campsites.push({
+    id: Date.now(),
+    name,
+    lat: parseFloat(document.getElementById('cf-lat').value)||0,
+    lng: parseFloat(document.getElementById('cf-lng').value)||0,
+    type:   document.getElementById('cf-type').value,
+    access: document.getElementById('cf-access').value,
+    cost:   document.getElementById('cf-cost').value,
+    rating: +document.getElementById('cf-rating').value,
+    notes:  document.getElementById('cf-notes').value,
+  });
+  save();
+  ['cf-name','cf-lat','cf-lng','cf-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cf-cost').value='$0';
+  document.getElementById('camps-add-panel').classList.remove('open');
+  renderCampsites();
+  if (routeMapInit) refreshRouteMap();
+  toast(`⛺ Campsite saved`);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function() {
+  load();
+  renderDashboard();
+  showPage('dashboard');
+});
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+</body>
+</html>
