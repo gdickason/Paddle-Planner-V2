@@ -168,7 +168,7 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
 /* ── ROUTE PLANNER ── */
 #page-route { flex-direction: row !important; }
 #route-sidebar {
-  width: 240px; flex-shrink: 0;
+  width: 256px; flex-shrink: 0;
   border-right: 1px solid var(--border);
   display: flex; flex-direction: column;
   overflow: hidden;
@@ -180,15 +180,32 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
 .route-stat { background: var(--bg); border-radius: 7px; padding: 7px 9px; }
 .route-stat-label { color: var(--dim); font-size: 9px; text-transform: uppercase; }
 .route-stat-val { color: var(--cyan); font-weight: 700; font-size: 15px; font-family: var(--mono); }
-.wp-list { flex: 1; overflow-y: auto; padding: 8px 14px; }
-.wp-item { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(18,34,56,0.8); }
+
+/* Day selector bar */
+.day-add-bar { padding: 8px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; display: flex; align-items: center; gap: 6px; background: rgba(34,211,238,0.03); }
+.day-add-label { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }
+.day-add-sel { flex: 1; font-size: 10px; padding: 4px 6px; border-radius: 6px; }
+.day-add-hint { color: var(--dim); font-size: 9px; font-family: var(--mono); white-space: nowrap; }
+
+.wp-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+.wp-day-group { margin-bottom: 2px; }
+.wp-day-group-header { display: flex; align-items: center; gap: 6px; padding: 5px 14px 3px; }
+.wp-day-group-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.wp-day-group-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--mono); }
+.wp-day-group-dist { font-size: 9px; color: var(--dim); font-family: var(--mono); margin-left: auto; }
+.wp-item { display: flex; gap: 8px; align-items: center; padding: 5px 14px; border-bottom: 1px solid rgba(18,34,56,0.5); }
+.wp-item:hover { background: rgba(34,211,238,0.03); }
 .wp-badge { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; flex-shrink: 0; font-family: var(--mono); }
-.wp-info { flex: 1; }
-.wp-name { font-size: 11px; font-weight: 600; color: var(--text); }
+.wp-info { flex: 1; min-width: 0; }
+.wp-name { font-size: 11px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wp-coords { font-size: 9px; color: var(--dim); font-family: var(--mono); }
-.wp-del { background: transparent; border: none; color: var(--dim); font-size: 16px; }
+.wp-del { background: transparent; border: none; color: var(--dim); font-size: 16px; padding: 0 2px; flex-shrink: 0; }
+.wp-del:hover { color: var(--red); }
 .sidebar-actions { display: flex; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
 .sidebar-actions button { flex: 1; border-radius: 7px; padding: 8px 0; font-size: 10px; font-weight: 700; font-family: var(--sans); border: 1.5px solid; transition: all 0.15s; }
+/* Add mode active pulse */
+@keyframes pulse-border { 0%,100%{border-color:#22d3ee} 50%{border-color:#0891b2} }
+.add-mode-active { animation: pulse-border 1.5s infinite; }
 #map-wrap { flex: 1; position: relative; }
 #route-map, #weather-map { width: 100%; height: 100%; }
 .map-no-trip { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; background: var(--bg); z-index: 10; }
@@ -483,9 +500,16 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
           <div class="route-stat"><div class="route-stat-label">Distance</div><div class="route-stat-val" id="rt-dist">—</div></div>
           <div class="route-stat"><div class="route-stat-label">Est. Days</div><div class="route-stat-val" id="rt-days">—</div></div>
         </div>
-        <div class="wp-list" id="wp-list"><div style="color:var(--dim);font-size:11px;text-align:center;padding:20px 0">Press "+ WP" then click the map</div></div>
+        <!-- Active day selector — shown when trip has dates -->
+        <div class="day-add-bar" id="day-add-bar" style="display:none">
+          <span class="day-add-label">Adding to</span>
+          <select class="day-add-sel" id="active-day-sel">
+            <option value="">Any day</option>
+          </select>
+        </div>
+        <div class="wp-list" id="wp-list"><div style="color:var(--dim);font-size:11px;text-align:center;padding:20px 0">Press <b style="color:var(--cyan)">W</b> or click <b style="color:var(--cyan)">+ WP</b> then click the map</div></div>
         <div class="sidebar-actions">
-          <button id="add-wp-btn" style="background:var(--bg);border-color:var(--b2);color:var(--muted)">+ WP</button>
+          <button id="add-wp-btn" style="background:var(--bg);border-color:var(--b2);color:var(--muted)">+ WP <span style="font-size:8px;opacity:0.5">[W]</span></button>
           <button id="add-camp-btn" style="background:var(--bg);border-color:var(--b2);color:var(--muted)">⛺ Site</button>
         </div>
         <!-- GPX Export -->
@@ -917,14 +941,15 @@ function initRouteMap() {
     if (addMode === 'waypoint') {
       const trip = getActiveTrip(); if (!trip) return;
       trip._wpCounter = (trip._wpCounter || 0) + 1;
-      const wp = { lat: e.latlng.lat, lng: e.latlng.lng, name: `WP ${trip._wpCounter}`, id: Date.now() };
+      const activeDayNum = getActiveDayForAdd();
+      const wp = { lat: e.latlng.lat, lng: e.latlng.lng, name: `WP ${trip._wpCounter}`, id: Date.now(), day: activeDayNum || null };
       trip.waypoints.push(wp);
       save();
-      addMode = null;
-      updateAddBtns();
+      // Stay in waypoint mode — only exit on Escape or button toggle
       refreshRouteMap();
       renderSidebar();
-      toast(`📍 Waypoint ${wp.name} placed`);
+      const dayMsg = activeDayNum ? ` (Day ${activeDayNum})` : '';
+      toast(`📍 WP ${trip._wpCounter} placed${dayMsg} — click again or press Esc`);
     } else if (addMode === 'campsite') {
       pendingCampLL = { lat: e.latlng.lat, lng: e.latlng.lng };
       addMode = null;
@@ -977,20 +1002,42 @@ function refreshRouteMap() {
     }).addTo(routeMap);
   }
 
-  // Waypoint markers
+  // Waypoint markers — draggable
   wps.forEach((wp, i) => {
     const isS = i===0, isE = i===wps.length-1;
-    const col = isS?'#4ade80':isE?'#f87171':'#22d3ee';
+    const trip = getActiveTrip();
+    const dayNum = wp.day;
+    const col = isS?'#4ade80':isE?'#f87171':(dayNum ? DAY_COLORS[(dayNum-1)%DAY_COLORS.length] : '#22d3ee');
     const lbl = isS?'S':isE?'E':String(i);
     const icon = L.divIcon({
       className: '',
-      html: `<div style="width:28px;height:28px;background:${col};border:2.5px solid #020c1a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#020c1a;font-family:var(--mono);box-shadow:0 2px 8px rgba(0,0,0,0.5)">${lbl}</div>`,
+      html: `<div style="width:28px;height:28px;background:${col};border:2.5px solid #020c1a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#020c1a;font-family:var(--mono);box-shadow:0 2px 8px rgba(0,0,0,0.5);cursor:grab">${lbl}</div>`,
       iconSize:[28,28], iconAnchor:[14,14],
     });
-    const marker = L.marker([wp.lat,wp.lng], {icon}).addTo(routeMap);
+    const marker = L.marker([wp.lat,wp.lng], {icon, draggable: true}).addTo(routeMap);
+
+    // Update position on drag
+    marker.on('drag', e => {
+      const t = getActiveTrip(); if (!t) return;
+      t.waypoints[i].lat = e.latlng.lat;
+      t.waypoints[i].lng = e.latlng.lng;
+      // Redraw polyline live
+      if (routePolyline) routePolyline.setLatLngs(t.waypoints.map(w=>[w.lat,w.lng]));
+    });
+    marker.on('dragend', e => {
+      const t = getActiveTrip(); if (!t) return;
+      t.waypoints[i].lat = e.target.getLatLng().lat;
+      t.waypoints[i].lng = e.target.getLatLng().lng;
+      save();
+      renderSidebar();
+      if (dashMapInit && dashMap) { refreshDashMap(); generateFloatPlan(); }
+      toast(`📍 ${t.waypoints[i].name} moved`);
+    });
+
     const popup = L.popup({closeButton:false}).setContent(`
       <div class="wp-popup-name">${esc(wp.name)}</div>
       <div class="wp-popup-coords">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Drag marker to reposition</div>
       <button class="wp-popup-del" onclick="removeWP(${i})">Remove Waypoint</button>
     `);
     marker.bindPopup(popup);
@@ -1106,6 +1153,16 @@ addCampBtn.addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', e => {
+  // W key = toggle waypoint add mode (only when on route page, not typing in input)
+  if ((e.key === 'w' || e.key === 'W') && state.page === 'route' &&
+      !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) {
+    if (!getActiveTrip()) { toast('⚠ Select a trip first'); return; }
+    addMode = addMode === 'waypoint' ? null : 'waypoint';
+    updateAddBtns();
+    if (routeMap) routeMap.getContainer().style.cursor = addMode ? 'crosshair' : '';
+    if (addMode) toast('📍 Waypoint mode ON — click map to place · Esc to stop');
+    return;
+  }
   if (e.key === 'Escape') {
     if (addMode) {
       addMode = null;
@@ -1116,6 +1173,13 @@ document.addEventListener('keydown', e => {
     if (document.getElementById('camp-modal').style.display !== 'none') closeCampModal();
   }
 });
+
+function getActiveDayForAdd() {
+  const sel = document.getElementById('active-day-sel');
+  if (!sel || !sel.value) return null;
+  const v = parseInt(sel.value);
+  return isNaN(v) ? null : v;
+}
 
 function updateAddBtns() {
   addWpBtn.style.background   = addMode==='waypoint' ?'#22d3ee':'var(--bg)';
@@ -1150,6 +1214,8 @@ function initMapSearch() {
   input.addEventListener('keydown', e => { if (e.key==='Enter') doSearch(); });
 }
 
+const DAY_COLORS = ['#22d3ee','#f59e0b','#4ade80','#f87171','#a78bfa','#fb923c','#34d399','#e879f9','#60a5fa','#fbbf24'];
+
 function renderSidebar() {
   const trip = getActiveTrip();
   document.getElementById('sidebar-trip-name').textContent = trip ? trip.name : 'No trip selected';
@@ -1167,48 +1233,82 @@ function renderSidebar() {
     document.getElementById('rt-days').textContent = '~'+Math.max(1,Math.ceil(totalNm/20));
   } else { statsEl.style.display = 'none'; }
 
+  // Day-add-bar: populate and show if trip has dates
+  const tripDates = getTripDates(trip);
+  const dayBar = document.getElementById('day-add-bar');
+  const dayBarSel = document.getElementById('active-day-sel');
+  if (tripDates.length && dayBar) {
+    dayBar.style.display = 'flex';
+    const prevVal = dayBarSel.value;
+    dayBarSel.innerHTML = `<option value="">Any day</option>` + tripDates.map((d,i) => {
+      const dt = new Date(d+'T12:00:00');
+      return `<option value="${i+1}">Day ${i+1} · ${dt.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'})}</option>`;
+    }).join('');
+    if (prevVal) dayBarSel.value = prevVal;
+  } else if (dayBar) {
+    dayBar.style.display = 'none';
+  }
+
   // GPX section visibility
   document.getElementById('gpx-section').style.display = wps.length ? 'block' : 'none';
   updateGpxDaySelect();
 
   const list = document.getElementById('wp-list');
   if (!wps.length) {
-    list.innerHTML = `<div style="color:var(--dim);font-size:11px;text-align:center;padding:20px 0">Press "+ WP" then click the map</div>`;
+    list.innerHTML = `<div style="color:var(--dim);font-size:11px;text-align:center;padding:24px 14px">Press <b style="color:var(--cyan)">W</b> or click <b style="color:var(--cyan)">+ WP</b><br>then click map to place waypoints</div>`;
     return;
   }
 
-  // Build trip day options
-  const tripDates = getTripDates(trip);
-  const dayOpts = tripDates.map((d,i) => {
-    const dt = new Date(d+'T12:00:00');
-    return `<option value="${i+1}">Day ${i+1} · ${dt.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'})}</option>`;
-  }).join('');
-  const noDayOpt = `<option value="">—</option>`;
-
-  list.innerHTML = wps.map((wp,i) => {
-    const isS=i===0,isE=i===wps.length-1;
-    const col=isS?'#4ade80':isE?'#f87171':'#22d3ee';
-    const lbl=isS?'S':isE?'E':String(i);
-    const dayLabel = wp.day ? `<span class="wp-day-badge">D${wp.day}</span>` : '';
-    const daySelectHtml = tripDates.length ? `<select class="wp-day-select" onchange="setWpDay(${i},this.value)">
-      ${noDayOpt}${dayOpts}
-    </select>` : '';
-    return `<div class="wp-item" style="flex-wrap:wrap;padding-bottom:8px">
-      <div class="wp-badge" style="background:${col};color:#020c1a">${lbl}</div>
-      <div class="wp-info">
-        <div class="wp-name">${wp.name} ${dayLabel}</div>
-        <div class="wp-coords">${wp.lat.toFixed(4)}, ${wp.lng.toFixed(4)}</div>
-        ${daySelectHtml ? `<div style="margin-top:3px">${daySelectHtml}</div>` : ''}
-      </div>
-      <button class="wp-del" onclick="removeWP(${i})">×</button>
-    </div>`;
-  }).join('');
-
-  // Restore day select values
-  wps.forEach((wp,i) => {
-    const sel = list.querySelectorAll('.wp-day-select')[i];
-    if (sel && wp.day) sel.value = String(wp.day);
+  // Group waypoints by day
+  const groups = {};
+  wps.forEach((wp, idx) => {
+    const d = wp.day || 0;
+    if (!groups[d]) groups[d] = [];
+    groups[d].push({ wp, idx });
   });
+  const sortedDays = Object.keys(groups).map(Number).sort((a,b) => a-b);
+
+  let html = '';
+  sortedDays.forEach(dayNum => {
+    const items = groups[dayNum];
+    const isUnassigned = dayNum === 0;
+    const dayColor = isUnassigned ? 'var(--dim)' : DAY_COLORS[(dayNum-1) % DAY_COLORS.length];
+    let dayLabel = isUnassigned ? 'Unassigned' : `Day ${dayNum}`;
+    if (!isUnassigned && tripDates[dayNum-1]) {
+      const dt = new Date(tripDates[dayNum-1]+'T12:00:00');
+      dayLabel = `Day ${dayNum} · ${dt.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'})}`;
+    }
+    let dayNm = 0;
+    for (let k=0; k<items.length-1; k++) dayNm += nmBetween(items[k].wp, items[k+1].wp);
+
+    html += `<div class="wp-day-group">
+      <div class="wp-day-group-header">
+        <div class="wp-day-group-dot" style="background:${dayColor}"></div>
+        <span class="wp-day-group-label" style="color:${dayColor}">${dayLabel}</span>
+        ${dayNm > 0.05 ? `<span class="wp-day-group-dist">${dayNm.toFixed(1)}nm</span>` : ''}
+      </div>`;
+
+    items.forEach(({ wp, idx }) => {
+      const isFirst = idx === 0;
+      const isLast = idx === wps.length - 1;
+      const seqLabel = isFirst ? 'S' : isLast ? 'E' : String(idx);
+      const dotCol = isFirst ? '#4ade80' : isLast ? '#f87171' : dayColor;
+      html += `<div class="wp-item">
+        <div class="wp-badge" style="background:${dotCol};color:#020c1a;flex-shrink:0">${seqLabel}</div>
+        <div class="wp-info">
+          <div class="wp-name">${esc(wp.name)}</div>
+          <div class="wp-coords">${wp.lat.toFixed(4)}, ${wp.lng.toFixed(4)}</div>
+        </div>
+        ${tripDates.length ? `<select style="width:46px;font-size:9px;padding:2px 3px;border-radius:4px;border:1px solid var(--b2);background:var(--bg);color:var(--text);flex-shrink:0" onchange="setWpDay(${idx},this.value)" title="Assign to day">
+          <option value="">—</option>
+          ${tripDates.map((_,di) => `<option value="${di+1}" ${wp.day===di+1?'selected':''}>D${di+1}</option>`).join('')}
+        </select>` : ''}
+        <button class="wp-del" onclick="removeWP(${idx})" title="Remove">×</button>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  list.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1607,7 +1707,6 @@ function renderWxWindArrows() {
   const col = bftColor(b);
 
   // DAY-COLORED ROUTE: color segments by assigned day
-  const DAY_COLORS = ['#22d3ee','#f59e0b','#4ade80','#f87171','#a78bfa','#fb923c','#34d399','#e879f9','#60a5fa','#fbbf24'];
   const tripDates = getTripDates(trip);
 
   if (wps.length > 1) {
@@ -1890,24 +1989,46 @@ function loadDashWeather(trip) {
   if (trip.id === _lastDashWxTrip && now - _lastDashWxLoad < 2*60*1000) return;
   _lastDashWxLoad = now;
   _lastDashWxTrip = trip.id;
-  const lat = trip.waypoints?.[0]?.lat??36.8;
-  const lng = trip.waypoints?.[0]?.lng??-76.0;
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&hourly=windspeed_10m,winddirection_10m,weathercode,temperature_2m&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&forecast_days=1`;
-  const marUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&hourly=wave_height&timezone=auto&forecast_days=1`;
+  const lat = trip.waypoints?.[0]?.lat ?? 36.8;
+  const lng = trip.waypoints?.[0]?.lng ?? -76.0;
+
+  // Determine which date to show: trip start date if in future & within 14 days, else today
+  const today = new Date(); today.setHours(0,0,0,0);
+  let targetDayIdx = 0; // index into 14-day forecast (0 = today)
+  let targetLabel = 'Today';
+  if (trip.startDate) {
+    const start = new Date(trip.startDate+'T00:00:00');
+    const daysAhead = Math.round((start - today) / 86400000);
+    if (daysAhead > 0 && daysAhead <= 13) {
+      targetDayIdx = daysAhead;
+      const dt = new Date(trip.startDate+'T12:00:00');
+      targetLabel = `Dep. ${dt.toLocaleDateString('en',{month:'short',day:'numeric'})}`;
+    } else if (daysAhead < 0) {
+      targetLabel = 'Trip past';
+    }
+  }
+
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&hourly=windspeed_10m,winddirection_10m,weathercode,temperature_2m&daily=temperature_2m_max,temperature_2m_min,windspeed_10m_max&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&forecast_days=14`;
+  const marUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&hourly=wave_height&timezone=auto&forecast_days=14`;
   const p1 = fetch(url).then(r=>r.json());
   const p2 = fetch(marUrl).then(r=>r.ok?r.json():null).catch(()=>null);
   Promise.all([p1,p2]).then(([d,marine])=>{
-    const hr = new Date().getHours();
-    const wind = d.hourly.windspeed_10m?.[hr]??0;
+    // Pick hour 8am on the target day
+    const hr = targetDayIdx * 24 + 8;
+    const wind = d.hourly.windspeed_10m?.[hr] ?? 0;
     const wave = marine?.hourly?.wave_height?.[hr] ?? null;
-    const temp = d.hourly.temperature_2m?.[hr]??60;
-    const code = d.hourly.weathercode?.[hr]??0;
-    const gng = calcGoNoGo(wind,wave,temp,code);
+    const temp = d.hourly.temperature_2m?.[hr] ?? 60;
+    const code = d.hourly.weathercode?.[hr] ?? 0;
+    const hiTemp = d.daily?.temperature_2m_max?.[targetDayIdx] ?? temp;
+    const loTemp = d.daily?.temperature_2m_min?.[targetDayIdx] ?? temp;
+    const gng = calcGoNoGo(wind, wave, temp, code);
     const el = document.getElementById('dash-gng');
     el.className = `gng-card ${gng.overall}`;
     const gngLabels = {go:'✓ GO — Conditions Favorable',caution:'⚠ CAUTION',nogo:'✕ NO-GO — Stay Ashore'};
     const gngColors = {go:'var(--green)',caution:'#fde047',nogo:'var(--red)'};
-    document.getElementById('dash-gng-status').textContent = gngLabels[gng.overall];
+    document.getElementById('dash-gng-status').innerHTML =
+      `<span style="font-size:12px">${gngLabels[gng.overall]}</span>
+       <span style="font-size:9px;color:var(--muted);font-weight:400;display:block;margin-top:2px">${targetLabel} · ${Math.round(hiTemp)}°/${Math.round(loTemp)}°F · ${Math.round(wind)}mph wind</span>`;
     document.getElementById('dash-gng-status').style.color = gngColors[gng.overall];
     document.getElementById('dash-gng-rows').innerHTML = gng.checks.map(c=>`
       <div class="gng-row">
@@ -1960,6 +2081,7 @@ function renderTripList() {
 
 function selectTrip(id) {
   state.activeTripId = id;
+  _lastDashWxTrip = null; // force weather reload for new trip
   renderDashboard();
   if (routeMapInit) refreshRouteMap(), renderSidebar();
   if (weatherMapInit) loadWeather();
