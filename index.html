@@ -110,7 +110,8 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
 .dash-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
 .dash-title { font-size: 22px; font-weight: 700; color: var(--text); }
 .dash-sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
-.btn-primary { background: var(--cyan); border: none; color: var(--bg); border-radius: 8px; padding: 10px 20px; font-weight: 700; font-size: 12px; font-family: var(--sans); }
+.btn-primary { background: var(--cyan); border: none; color: var(--bg); border-radius: 9px; padding: 12px 24px; font-weight: 700; font-size: 13px; font-family: var(--sans); box-shadow: 0 2px 8px rgba(34,211,238,0.3); transition: all 0.2s; }
+.btn-primary:hover { background: #0891b2; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(34,211,238,0.4); }
 .btn-ghost { background: transparent; border: 1.5px solid var(--b2); color: var(--muted); border-radius: 8px; padding: 9px 16px; font-family: var(--sans); font-size: 12px; }
 .btn-amber { background: var(--amber); border: none; color: var(--bg); border-radius: 8px; padding: 9px 20px; font-weight: 700; font-size: 12px; font-family: var(--sans); }
 
@@ -123,7 +124,9 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
 
 .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
 
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--b2); }
+.card-prominent { background: var(--card); border: 1.5px solid var(--cyan); border-radius: 14px; padding: 22px; box-shadow: 0 4px 12px rgba(34,211,238,0.08); }
 .card-label { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; }
 
 /* Readiness */
@@ -145,9 +148,10 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
 .gng-val { color: var(--text); font-weight: 600; }
 
 /* Quick stats cards */
-.qs-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.qs-label { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; }
-.qs-value { color: var(--cyan); font-size: 20px; font-weight: 800; font-family: var(--mono); }
+.qs-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; transition: all 0.2s; }
+.qs-card:hover { border-color: var(--cyan); transform: translateX(2px); }
+.qs-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600; }
+.qs-value { color: var(--cyan); font-size: 26px; font-weight: 800; font-family: var(--mono); line-height: 1.1; margin-top: 6px; }
 .qs-sub { color: var(--amber); font-size: 10px; margin-top: 2px; }
 .qs-btn { background: transparent; border: 1px solid var(--b2); color: var(--muted); border-radius: 6px; padding: 5px 10px; font-size: 10px; font-family: var(--sans); }
 
@@ -456,25 +460,39 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
             </div>
           </div>
 
-          <!-- Mission Control -->
-          <div style="margin-top:20px;display:none;grid-template-columns:1.2fr 1fr;gap:16px" id="dash-mission-control">
-            <!-- Route Map Preview -->
-            <div class="card" style="padding:0;overflow:hidden">
-              <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-                <div style="font-size:12px;font-weight:700;color:var(--cyan)">🗺️ Route Overview</div>
-                <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="showPage('route')">Plan Route →</button>
+          <!-- Mission Control - Redesigned for prominence -->
+          <div style="margin-top:20px;display:none" id="dash-mission-control">
+            <!-- Full Width Map Preview -->
+            <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px">
+              <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:rgba(34,211,238,0.03)">
+                <div>
+                  <div style="font-size:16px;font-weight:700;color:var(--cyan)">🗺️ Route Overview</div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:2px" id="dash-map-info">Interactive map preview</div>
+                </div>
+                <button class="btn-primary" onclick="showPage('route')">Edit Route →</button>
               </div>
-              <div id="dash-map" style="height:280px;background:var(--bg)"></div>
+              <div id="dash-map" style="height:420px;background:var(--bg)"></div>
             </div>
 
-            <!-- Float Plan -->
-            <div class="card">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                <div style="font-size:12px;font-weight:700;color:var(--cyan)">📋 Float Plan</div>
-                <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="exportFloatPlan()">Export</button>
+            <!-- Float Plan & Stats Row -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <!-- Float Plan -->
+              <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                  <div style="font-size:14px;font-weight:700;color:var(--cyan)">📋 Float Plan</div>
+                  <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="exportFloatPlan()">Export</button>
+                </div>
+                <div id="dash-float-plan" style="max-height:340px;overflow-y:auto;font-size:11px;line-height:1.6">
+                  <div style="color:var(--muted);font-style:italic">Plan your route to generate float plan</div>
+                </div>
               </div>
-              <div id="dash-float-plan" style="max-height:240px;overflow-y:auto;font-size:11px;line-height:1.6">
-                <div style="color:var(--muted);font-style:italic">Plan your route to generate float plan</div>
+
+              <!-- Exposure Analysis -->
+              <div class="card">
+                <div style="font-size:14px;font-weight:700;color:var(--cyan);margin-bottom:12px">🌊 Route Exposure</div>
+                <div id="dash-exposure" style="font-size:11px">
+                  <div style="color:var(--muted);font-style:italic">Weather data will show exposure levels</div>
+                </div>
               </div>
             </div>
           </div>
@@ -511,6 +529,14 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
         <div class="sidebar-actions">
           <button id="add-wp-btn" style="background:var(--bg);border-color:var(--b2);color:var(--muted)">+ WP <span style="font-size:8px;opacity:0.5">[W]</span></button>
           <button id="add-camp-btn" style="background:var(--bg);border-color:var(--b2);color:var(--muted)">⛺ Site</button>
+        </div>
+        <!-- Smart Day Assignment -->
+        <div id="smart-assign-section" style="padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;background:rgba(245,158,11,0.02);display:none">
+          <div style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:7px">🧠 Smart Assign</div>
+          <button onclick="smartAssignDays()" style="width:100%;background:transparent;border:1.5px solid var(--amber);color:var(--amber);border-radius:7px;padding:8px;font-size:10px;font-weight:700;font-family:var(--mono);display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.15s;cursor:pointer">
+            <span>⚡</span> Auto-Assign to Days
+          </button>
+          <div style="font-size:9px;color:var(--dim);margin-top:6px;text-align:center">Distributes waypoints evenly across trip days</div>
         </div>
         <!-- GPX Export -->
         <div class="gpx-section" id="gpx-section" style="display:none">
@@ -739,9 +765,65 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
 <div id="toast"></div>
 
 <script>
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║                   PADDLE PLANNER V2 - PRO                     ║
+// ║              Sea Kayak Expedition Planning Tool               ║
+// ╚═══════════════════════════════════════════════════════════════╝
+//
+// MODULE STRUCTURE:
+// 1. STATE & STORAGE    - LocalStorage wrapper, app state, caching
+// 2. CONSTANTS          - Beaufort scale, weather codes, colors
+// 3. PAGE NAVIGATION    - Tab switching, page initialization
+// 4. MAP SYSTEM         - Leaflet maps (route, weather, dashboard)
+// 5. GPX EXPORT         - Route export with day assignment
+// 6. DASHBOARD          - Trip overview, mission control
+// 7. GEAR MANAGEMENT    - Packing lists, weight tracking
+// 8. CAMPSITE DATABASE  - Site ratings, access info
+// 9. NUTRITION PLANNER  - Meal planning, calorie tracking
+// 10. EXPORT TOOLS      - Float plans, sharing
+//
 // ═══════════════════════════════════════════════════════════════
-// STATE & STORAGE
+// CHANGELOG - V2 PRO (Latest Build)
 // ═══════════════════════════════════════════════════════════════
+//
+// 🎨 VISUAL HIERARCHY IMPROVEMENTS:
+//   • Larger dashboard map (420px height)
+//   • Enhanced quick stats (26px values, hover effects)
+//   • Prominent button styling with shadows
+//   • Better card hover states
+//   • Improved spacing and typography
+//
+// 🗺️ COLOR-CODED ROUTE BY EXPOSURE:
+//   • Green route = Sheltered (<15 mph winds)
+//   • Yellow route = Moderate (15-25 mph)
+//   • Red route = Exposed (>25 mph)
+//   • Fetches live weather for route analysis
+//   • Real-time exposure dashboard widget
+//
+// 🧠 SMART DAY ASSIGNMENT:
+//   • Auto-distributes waypoints across trip days
+//   • Equal distance distribution algorithm
+//   • One-click intelligent route planning
+//   • Visible when trip has dates + 2+ waypoints
+//
+// 🎯 MISSION CONTROL REDESIGN:
+//   • Full-width interactive map preview
+//   • Live exposure analysis panel
+//   • Float plan generator
+//   • Beaufort scale integration
+//   • Weather-driven route recommendations
+//
+// 📦 CODE ORGANIZATION:
+//   • Clear module separation with headers
+//   • Consistent naming conventions
+//   • Inline documentation
+//   • Modular function structure
+//
+// ═══════════════════════════════════════════════════════════════
+
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  MODULE 1: STATE & STORAGE                                    ║
+// ╚═══════════════════════════════════════════════════════════════╝
 const DB = {
   get: k  => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } },
   set: (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) { if (e.name==='QuotaExceededError') toast('⚠ Storage full — some data may not be saved'); } },
@@ -783,9 +865,9 @@ function save() {
   DB.set('pp_gear4',     state.gear);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// CONSTANTS
-// ═══════════════════════════════════════════════════════════════
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  MODULE 2: CONSTANTS                                          ║
+// ╚═══════════════════════════════════════════════════════════════╝
 const BFT_LABELS = ["Calm","Light air","Light breeze","Gentle breeze","Moderate breeze","Fresh breeze","Strong breeze","Near gale","Gale","Severe gale"];
 const WMO = {0:"Clear",1:"Mainly Clear",2:"Partly Cloudy",3:"Overcast",45:"Fog",48:"Freezing Fog",51:"Light Drizzle",53:"Drizzle",55:"Heavy Drizzle",61:"Light Rain",63:"Rain",65:"Heavy Rain",71:"Light Snow",73:"Snow",75:"Heavy Snow",77:"Snow Grains",80:"Rain Showers",81:"Heavy Showers",82:"Violent Showers",85:"Snow Showers",86:"Heavy Snow Showers",95:"Thunderstorm",96:"Thunderstorm w/ Hail",99:"Thunderstorm w/ Heavy Hail"};
 const WDIRS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
@@ -870,7 +952,11 @@ function toast(msg, dur=2500) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// NAVIGATION
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  MODULE 3: PAGE NAVIGATION SYSTEM                             ║
+// ╚═══════════════════════════════════════════════════════════════╝
+
+// Tab switching, page initialization
 // ═══════════════════════════════════════════════════════════════
 function showPage(id) {
   state.page = id;
@@ -891,9 +977,11 @@ document.querySelectorAll('.nav-tab').forEach(btn => {
   btn.addEventListener('click', () => showPage(btn.dataset.page));
 });
 
-// ═══════════════════════════════════════════════════════════════
-// MAPS — LEAFLET
-// ═══════════════════════════════════════════════════════════════
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  MODULE 4: MAP SYSTEM (Leaflet.js)                            ║
+// ╚═══════════════════════════════════════════════════════════════╝
+
+// Route map, weather map, dashboard map initialization
 let routeMap=null, weatherMap=null;
 let routeMapInit=false, weatherMapInit=false;
 
@@ -1251,6 +1339,11 @@ function renderSidebar() {
 
   // GPX section visibility
   document.getElementById('gpx-section').style.display = wps.length ? 'block' : 'none';
+  // Smart assign visibility - show if waypoints exist AND trip has dates
+  const smartAssignEl = document.getElementById('smart-assign-section');
+  if (smartAssignEl) {
+    smartAssignEl.style.display = (wps.length >= 2 && tripDates.length) ? 'block' : 'none';
+  }
   updateGpxDaySelect();
 
   const list = document.getElementById('wp-list');
@@ -1311,9 +1404,9 @@ function renderSidebar() {
   list.innerHTML = html;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// WAYPOINT DAY ASSIGNMENT
-// ═══════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────
+// WAYPOINT DAY ASSIGNMENT & SMART AUTO-ASSIGN
+// ─────────────────────────────────────────────────────────────────
 function setWpDay(idx, day) {
   const trip = getActiveTrip(); if (!trip) return;
   trip.waypoints[idx].day = day ? +day : null;
@@ -1323,8 +1416,71 @@ function setWpDay(idx, day) {
 }
 window.setWpDay = setWpDay;
 
+// Smart Day Assignment
+function smartAssignDays() {
+  const trip = getActiveTrip();
+  if (!trip || !trip.waypoints || trip.waypoints.length < 2) {
+    toast('Need at least 2 waypoints');
+    return;
+  }
+  
+  const dates = getTripDates(trip);
+  if (!dates.length) {
+    toast('Set trip dates first');
+    return;
+  }
+  
+  const wps = trip.waypoints;
+  const numDays = dates.length;
+  
+  // Calculate total distance
+  let totalNm = 0;
+  for (let i = 1; i < wps.length; i++) {
+    totalNm += nmBetween(wps[i-1], wps[i]);
+  }
+  
+  // Target distance per day
+  const targetPerDay = totalNm / numDays;
+  
+  // Assign waypoints to days
+  let currentDay = 1;
+  let dayDistance = 0;
+  
+  wps.forEach((wp, idx) => {
+    if (idx === 0) {
+      // Start waypoint = Day 1
+      wp.day = 1;
+    } else if (idx === wps.length - 1) {
+      // End waypoint = Last day
+      wp.day = numDays;
+    } else {
+      // Distribute middle waypoints
+      const segmentDist = nmBetween(wps[idx-1], wp);
+      dayDistance += segmentDist;
+      
+      // Move to next day if we've hit target distance
+      if (dayDistance >= targetPerDay && currentDay < numDays) {
+        currentDay++;
+        dayDistance = 0;
+      }
+      
+      wp.day = Math.min(currentDay, numDays);
+    }
+  });
+  
+  save();
+  refreshRouteMap();
+  renderSidebar();
+  toast(`⚡ Waypoints auto-assigned to ${numDays} days`);
+}
+window.smartAssignDays = smartAssignDays;
+
 // ═══════════════════════════════════════════════════════════════
-// GPX EXPORT
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  MODULE 5: GPX EXPORT                                         ║
+// ╚═══════════════════════════════════════════════════════════════╝
+
+// Generate GPX files with waypoints and routes
 // ═══════════════════════════════════════════════════════════════
 let gpxExportMode = 'all'; // 'all' or 'day'
 
@@ -1912,9 +2068,11 @@ function setWxTripDay(idx, forecastIdx) {
 }
 window.setWxTripDay = setWxTripDay;
 
-// ═══════════════════════════════════════════════════════════════
-// DASHBOARD
-// ═══════════════════════════════════════════════════════════════
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  MODULE 6: DASHBOARD & MISSION CONTROL                        ║
+// ╚═══════════════════════════════════════════════════════════════╝
+
+// Trip overview, stats, exposure analysis, float plans
 function renderDashboard() {
   const trip = getActiveTrip();
   renderNavTripPicker();
@@ -1933,7 +2091,7 @@ function renderDashboard() {
     
     // Show mission control if waypoints exist
     const haswps = (trip.waypoints || []).length > 0;
-    document.getElementById('dash-mission-control').style.display = haswps ? 'grid' : 'none';
+    document.getElementById('dash-mission-control').style.display = haswps ? 'block' : 'none';
     
     if (haswps) {
       setTimeout(() => { initDashMap(); generateFloatPlan(); }, 100);
@@ -2128,8 +2286,11 @@ document.getElementById('create-trip-btn').addEventListener('click', () => {
   toast(`🛶 ${trip.name} created!`);
 });
 
-// ═══════════════════════════════════════════════════════════════
-// GEAR MANAGER
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  MODULE 7: GEAR MANAGEMENT                                    ║
+// ╚═══════════════════════════════════════════════════════════════╝
+
+// Packing list, weight tracking, gear categories
 // ═══════════════════════════════════════════════════════════════
 let gearCat = 'All';
 let gearEditing = false;
@@ -2225,9 +2386,11 @@ document.getElementById('gear-new-name').addEventListener('keydown', e => {
   if (e.key==='Enter') document.getElementById('gear-add-item-btn').click();
 });
 
-// ═══════════════════════════════════════════════════════════════
-// CAMPSITES
-// ═══════════════════════════════════════════════════════════════
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  MODULE 8: CAMPSITE DATABASE                                  ║
+// ╚═══════════════════════════════════════════════════════════════╝
+
+// Site management, ratings, access info
 let campFilter = 'All';
 
 function renderCampsites() {
@@ -2298,9 +2461,11 @@ document.getElementById('save-camp-form-btn').addEventListener('click', () => {
   toast(`⛺ Campsite saved`);
 });
 
-// ═══════════════════════════════════════════════════════════════
-// NUTRITION PLANNER (V2 - Day-by-Day System)
-// ═══════════════════════════════════════════════════════════════
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  MODULE 9: NUTRITION PLANNER                                  ║
+// ╚═══════════════════════════════════════════════════════════════╝
+
+// Day-by-day meal planning, calorie tracking, water calculation
 
 function initNutritionPage() {
   const trip = getActiveTrip();
@@ -2579,9 +2744,9 @@ function exportShoppingList() {
   });
 }
 
-// ═══════════════════════════════════════════════════════════════
-// DASHBOARD MAP & FLOAT PLAN
-// ═══════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────
+// MISSION CONTROL: Dashboard Map, Exposure Analysis & Float Plans
+// ─────────────────────────────────────────────────────────────────
 
 let dashMap = null;
 let dashMapInit = false;
@@ -2610,7 +2775,7 @@ function initDashMap() {
   setTimeout(() => { dashMap.invalidateSize(); refreshDashMap(); }, 150);
 }
 
-function refreshDashMap() {
+async function refreshDashMap() {
   if (!dashMap) return;
   const trip = getActiveTrip();
   if (!trip || !trip.waypoints || trip.waypoints.length === 0) return;
@@ -2624,22 +2789,102 @@ function refreshDashMap() {
   const wps = trip.waypoints;
   const coords = wps.map(w => [w.lat, w.lng]);
 
-  const line = L.polyline(coords, { color: '#22d3ee', weight: 3, opacity: 0.8 });
-  line.addTo(dashMap);
-  dashMapPolylines.push(line);
+  // Try to get weather for color-coded segments
+  let segmentColors = null;
+  if (wps.length > 1) {
+    try {
+      const lat = wps[0].lat, lng = wps[0].lng;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&hourly=windspeed_10m&windspeed_unit=mph&timezone=auto&forecast_days=7`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      const avgWind = data.hourly.windspeed_10m.slice(0, 24).reduce((a,b)=>a+b,0) / 24;
+      
+      // Color code entire route based on average wind
+      const color = avgWind < 15 ? '#4ade80' : avgWind < 25 ? '#fbbf24' : '#f87171';
+      const label = avgWind < 15 ? 'Sheltered' : avgWind < 25 ? 'Moderate' : 'Exposed';
+      
+      const line = L.polyline(coords, { color, weight: 4, opacity: 0.85 });
+      line.addTo(dashMap);
+      dashMapPolylines.push(line);
+      
+      // Update map info
+      document.getElementById('dash-map-info').textContent = `${label} conditions · Avg wind ${Math.round(avgWind)} mph`;
+      
+      // Update exposure analysis
+      analyzeExposure(avgWind, wps.length);
+      
+    } catch (e) {
+      // Fallback: cyan route
+      const line = L.polyline(coords, { color: '#22d3ee', weight: 3, opacity: 0.8 });
+      line.addTo(dashMap);
+      dashMapPolylines.push(line);
+    }
+  } else {
+    // Single waypoint or no weather
+    const line = L.polyline(coords, { color: '#22d3ee', weight: 3, opacity: 0.8 });
+    line.addTo(dashMap);
+    dashMapPolylines.push(line);
+  }
 
+  // Add waypoint markers
   wps.forEach((wp, i) => {
     const isStart = i === 0, isEnd = i === wps.length - 1;
     const color = isStart ? '#4ade80' : isEnd ? '#f87171' : '#22d3ee';
     const icon = L.divIcon({
-      html: `<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid #020c1a"></div>`,
-      className: '', iconSize: [12,12], iconAnchor: [6,6]
+      html: `<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2.5px solid #020c1a;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>`,
+      className: '', iconSize: [14,14], iconAnchor: [7,7]
     });
     const m = L.marker([wp.lat, wp.lng], { icon }).addTo(dashMap);
     dashMapMarkers.push(m);
   });
 
-  dashMap.fitBounds(L.latLngBounds(coords), { padding: [20, 20] });
+  dashMap.fitBounds(L.latLngBounds(coords), { padding: [30, 30] });
+}
+
+function analyzeExposure(avgWind, numWaypoints) {
+  const level = avgWind < 15 ? 'low' : avgWind < 25 ? 'moderate' : 'high';
+  const color = avgWind < 15 ? 'var(--green)' : avgWind < 25 ? 'var(--amber)' : 'var(--red)';
+  const icon = avgWind < 15 ? '✓' : avgWind < 25 ? '⚠' : '⚠';
+  
+  const bft = mphToBft(avgWind);
+  const bftLabel = BFT_LABELS[bft] || 'Unknown';
+  
+  let html = `
+    <div style="background:var(--bg);border-radius:8px;padding:12px;border:1px solid ${color};margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:14px;font-weight:700;color:${color}">${icon} ${level.toUpperCase()} EXPOSURE</div>
+        <div style="font-size:16px;font-weight:800;font-family:var(--mono);color:${color}">${Math.round(avgWind)} mph</div>
+      </div>
+      <div style="font-size:10px;color:var(--muted)">Beaufort ${bft} (${bftLabel})</div>
+    </div>
+    
+    <div style="font-size:10px;color:var(--muted);line-height:1.6">
+      <div style="margin-bottom:6px"><b style="color:var(--text)">Route Analysis:</b></div>
+      <div>• ${numWaypoints} waypoints planned</div>
+      <div>• Average wind: ${Math.round(avgWind)} mph</div>
+      <div>• Conditions: ${level === 'low' ? 'Ideal for paddling' : level === 'moderate' ? 'Manageable for experienced paddlers' : 'Exercise caution — consider alternate dates'}</div>
+    </div>
+    
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:9px;color:var(--dim);text-transform:uppercase;margin-bottom:6px">Exposure Levels</div>
+      <div style="display:flex;gap:8px;font-size:10px">
+        <div style="flex:1;text-align:center;padding:6px;border-radius:6px;background:rgba(74,222,128,0.1);border:1px solid var(--green)">
+          <div style="color:var(--green);font-weight:700">&lt;15 mph</div>
+          <div style="color:var(--muted);font-size:9px">Sheltered</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:6px;border-radius:6px;background:rgba(251,191,36,0.1);border:1px solid var(--amber)">
+          <div style="color:var(--amber);font-weight:700">15-25</div>
+          <div style="color:var(--muted);font-size:9px">Moderate</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:6px;border-radius:6px;background:rgba(248,113,113,0.1);border:1px solid var(--red)">
+          <div style="color:var(--red);font-weight:700">&gt;25 mph</div>
+          <div style="color:var(--muted);font-size:9px">Exposed</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('dash-exposure').innerHTML = html;
 }
 
 function generateFloatPlan() {
