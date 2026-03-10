@@ -439,7 +439,7 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
           </div>
 
           <!-- Mission Control -->
-          <div style="margin-top:20px;display:grid;grid-template-columns:1.2fr 1fr;gap:16px" id="dash-mission-control">
+          <div style="margin-top:20px;display:none;grid-template-columns:1.2fr 1fr;gap:16px" id="dash-mission-control">
             <!-- Route Map Preview -->
             <div class="card" style="padding:0;overflow:hidden">
               <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
@@ -606,166 +606,65 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
     <!-- NUTRITION PLANNER -->
     <div class="page" id="page-nutrition">
       <div style="display:flex;flex-direction:column;height:100%;overflow:hidden">
-        <!-- Top Bar -->
+        <!-- Top Bar with Countdown -->
         <div style="padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div>
               <div style="font-size:18px;font-weight:700;color:var(--text)">🍎 Nutrition Planner</div>
               <div style="font-size:11px;color:var(--muted);margin-top:2px" id="nut-trip-info">Select a trip to plan nutrition</div>
             </div>
-            <button class="btn-primary" onclick="generateShoppingList()">🛒 Shopping List</button>
+            <div style="display:flex;gap:10px;align-items:center">
+              <div id="nut-countdown" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 14px;display:none">
+                <div style="font-size:9px;color:var(--muted);text-transform:uppercase;text-align:center">Departure</div>
+                <div style="font-size:16px;font-weight:800;font-family:var(--mono);color:var(--amber);text-align:center" id="nut-countdown-days">—</div>
+              </div>
+              <button class="btn-primary" onclick="exportShoppingList()">🛒 Shopping List</button>
+            </div>
           </div>
         </div>
 
-        <!-- Content -->
-        <div style="flex:1;overflow-y:auto;padding:20px">
-          <div style="max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:20px">
-            
-            <!-- Left Column: Calculator & Water -->
-            <div>
-              <!-- Calorie Calculator -->
-              <div class="card" style="margin-bottom:16px">
-                <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--cyan)">📊 Daily Calorie Needs</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-                  <div>
-                    <label>Body Weight (lbs)</label>
-                    <input type="number" id="nut-weight" value="180" onchange="updateNutritionCalc()">
-                  </div>
-                  <div>
-                    <label>Activity Level</label>
-                    <select id="nut-activity" onchange="updateNutritionCalc()">
-                      <option value="3500">Moderate (3500 cal/day)</option>
-                      <option value="4200" selected>High (4200 cal/day)</option>
-                      <option value="5000">Extreme (5000 cal/day)</option>
-                    </select>
-                  </div>
-                </div>
-                <div style="background:var(--bg);border-radius:8px;padding:12px;border:1px solid var(--border)">
-                  <div style="display:flex;justify-content:space-between;align-items:center">
-                    <div>
-                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Daily Calories</div>
-                      <div style="font-size:24px;font-weight:800;font-family:var(--mono);color:var(--cyan)" id="nut-daily-cal">4,200</div>
-                    </div>
-                    <div>
-                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Trip Total</div>
-                      <div style="font-size:24px;font-weight:800;font-family:var(--mono);color:var(--amber)" id="nut-total-cal">21,000</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Water Calculator -->
-              <div class="card">
-                <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--cyan)">💧 Water Planning</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-                  <div>
-                    <label>Base water/day (L)</label>
-                    <input type="number" id="water-base" value="3.5" step="0.5" onchange="updateWaterCalc()">
-                  </div>
-                  <div>
-                    <label>Paddle hours/day</label>
-                    <input type="number" id="water-hours" value="6" step="0.5" onchange="updateWaterCalc()">
-                  </div>
-                </div>
-                <div style="margin-bottom:12px">
-                  <label>Temperature</label>
-                  <select id="water-temp" onchange="updateWaterCalc()">
-                    <option value="0">Cool (&lt;60°F)</option>
-                    <option value="0.5">Moderate (60-75°F)</option>
-                    <option value="1" selected>Warm (75-85°F)</option>
-                    <option value="1.5">Hot (&gt;85°F)</option>
-                  </select>
-                </div>
-                <div style="background:var(--bg);border-radius:8px;padding:12px;border:1px solid var(--border)">
-                  <div style="display:flex;justify-content:space-between;align-items:center">
-                    <div>
-                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Daily Water</div>
-                      <div style="font-size:20px;font-weight:800;font-family:var(--mono);color:var(--cyan)" id="water-daily">5.5 L</div>
-                      <div style="font-size:9px;color:var(--muted)" id="water-daily-gal">(1.5 gal)</div>
-                    </div>
-                    <div>
-                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Weight/Day</div>
-                      <div style="font-size:20px;font-weight:800;font-family:var(--mono);color:var(--amber)" id="water-weight">12.1 lbs</div>
-                    </div>
-                  </div>
-                </div>
+        <!-- Summary Cards -->
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(34,211,238,0.03)">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+            <!-- Calorie Goal -->
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px">
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Daily Calorie Goal</div>
+              <div style="display:flex;align-items:baseline;gap:6px">
+                <input type="number" id="nut-cal-goal" value="4200" style="width:80px;padding:4px 6px;font-size:18px;font-weight:800;font-family:var(--mono);text-align:center" onchange="renderNutritionDays()">
+                <span style="font-size:11px;color:var(--muted)">cal/day</span>
               </div>
             </div>
 
-            <!-- Right Column: Meal Planning -->
-            <div>
-              <div class="card">
-                <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--cyan)">🍽️ Daily Meal Plan</div>
-                
-                <!-- Breakfast -->
-                <div style="margin-bottom:16px">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                    <span style="font-size:12px;font-weight:700;color:var(--text)">Breakfast (800 cal)</span>
-                    <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="addMeal('breakfast')">+ Add</button>
-                  </div>
-                  <div id="meals-breakfast" style="font-size:11px;color:var(--muted)">
-                    <div>• Instant Oatmeal (300 cal)</div>
-                    <div>• Granola & Nuts (250 cal)</div>
-                    <div>• Coffee + Powdered Milk (150 cal)</div>
-                    <div>• Energy Bar (200 cal)</div>
-                  </div>
-                </div>
-
-                <!-- Lunch -->
-                <div style="margin-bottom:16px">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                    <span style="font-size:12px;font-weight:700;color:var(--text)">Lunch (1000 cal)</span>
-                    <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="addMeal('lunch')">+ Add</button>
-                  </div>
-                  <div id="meals-lunch" style="font-size:11px;color:var(--muted)">
-                    <div>• Trail Mix (600 cal)</div>
-                    <div>• Jerky (100 cal)</div>
-                    <div>• Energy Bars x2 (300 cal)</div>
-                  </div>
-                </div>
-
-                <!-- Dinner -->
-                <div style="margin-bottom:16px">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                    <span style="font-size:12px;font-weight:700;color:var(--text)">Dinner (1400 cal)</span>
-                    <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="addMeal('dinner')">+ Add</button>
-                  </div>
-                  <div id="meals-dinner" style="font-size:11px;color:var(--muted)">
-                    <div>• Freeze-dried Pasta (600 cal)</div>
-                    <div>• Instant Potatoes (300 cal)</div>
-                    <div>• Cheese (200 cal)</div>
-                    <div>• Chocolate Bar (300 cal)</div>
-                  </div>
-                </div>
-
-                <!-- Snacks -->
-                <div style="margin-bottom:16px">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                    <span style="font-size:12px;font-weight:700;color:var(--text)">Snacks (1000 cal)</span>
-                    <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="addMeal('snacks')">+ Add</button>
-                  </div>
-                  <div id="meals-snacks" style="font-size:11px;color:var(--muted)">
-                    <div>• Dark Chocolate (340 cal)</div>
-                    <div>• Peanut Butter Packets (380 cal)</div>
-                    <div>• Gummy Bears (280 cal)</div>
-                  </div>
-                </div>
-
-                <!-- Total -->
-                <div style="background:var(--bg);border-radius:8px;padding:12px;border:1px solid var(--cyan);margin-top:16px">
-                  <div style="display:flex;justify-content:space-between;align-items:center">
-                    <div>
-                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Daily Total</div>
-                      <div style="font-size:20px;font-weight:800;font-family:var(--mono);color:var(--cyan)">4,200 cal</div>
-                    </div>
-                    <div>
-                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Food Weight</div>
-                      <div style="font-size:20px;font-weight:800;font-family:var(--mono);color:var(--amber)">~2.0 lbs</div>
-                    </div>
-                  </div>
-                </div>
+            <!-- Body Weight (for water calc) -->
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px">
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Body Weight</div>
+              <div style="display:flex;align-items:baseline;gap:6px">
+                <input type="number" id="nut-weight" value="180" style="width:70px;padding:4px 6px;font-size:18px;font-weight:800;font-family:var(--mono);text-align:center" onchange="autoCalcWater()">
+                <span style="font-size:11px;color:var(--muted)">lbs</span>
               </div>
             </div>
+
+            <!-- Auto Water -->
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px">
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Water/Day (Auto)</div>
+              <div style="font-size:18px;font-weight:800;font-family:var(--mono);color:var(--cyan)" id="nut-water-daily">5.5 L</div>
+              <div style="font-size:9px;color:var(--dim);margin-top:2px" id="nut-water-source">Based on weight + weather</div>
+            </div>
+
+            <!-- Total Weight -->
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px">
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Total Food Weight</div>
+              <div style="font-size:18px;font-weight:800;font-family:var(--mono);color:var(--amber)" id="nut-total-weight">—</div>
+              <div style="font-size:9px;color:var(--dim);margin-top:2px" id="nut-total-weight-sub">Across all days</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Day-by-Day Meal Planning -->
+        <div style="flex:1;overflow-y:auto;padding:20px" id="nut-days-container">
+          <div style="text-align:center;color:var(--dim);padding:40px">
+            <div style="font-size:40px;margin-bottom:12px">🛶</div>
+            <div style="font-size:14px">Create a trip with dates to start planning meals</div>
           </div>
         </div>
       </div>
@@ -960,7 +859,7 @@ function showPage(id) {
   if (id==='gear')      renderGear();
   if (id==='dashboard') renderDashboard();
   if (id==='campsites') renderCampsites();
-  if (id==='nutrition') { updateNutritionCalc(); updateWaterCalc(); }
+  if (id==='nutrition') initNutritionPage();
 }
 
 document.querySelectorAll('.nav-tab').forEach(btn => {
@@ -1937,8 +1836,15 @@ function renderDashboard() {
     renderReadiness(trip);
     loadDashWeather(trip);
     renderQuickStats(trip);
-    initDashMap();
-    setTimeout(() => { refreshDashMap(); generateFloatPlan(); }, 100);
+    
+    // Show mission control if waypoints exist
+    const haswps = (trip.waypoints || []).length > 0;
+    document.getElementById('dash-mission-control').style.display = haswps ? 'grid' : 'none';
+    
+    if (haswps) {
+      initDashMap();
+      setTimeout(() => { refreshDashMap(); generateFloatPlan(); }, 100);
+    }
   }
   renderTripList();
 }
@@ -2277,73 +2183,267 @@ document.getElementById('save-camp-form-btn').addEventListener('click', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// NUTRITION PLANNER
+// NUTRITION PLANNER (V2 - Day-by-Day System)
 // ═══════════════════════════════════════════════════════════════
 
-function updateNutritionCalc() {
+function initNutritionPage() {
   const trip = getActiveTrip();
-  const days = trip ? getTripDates(trip).length : 5;
-  const dailyCal = parseInt(document.getElementById('nut-activity').value);
-  const totalCal = dailyCal * days;
+  if (!trip) {
+    document.getElementById('nut-trip-info').textContent = 'Select a trip to plan nutrition';
+    document.getElementById('nut-countdown').style.display = 'none';
+    document.getElementById('nut-days-container').innerHTML = `
+      <div style="text-align:center;color:var(--dim);padding:40px">
+        <div style="font-size:40px;margin-bottom:12px">🛶</div>
+        <div style="font-size:14px">Create a trip with dates to start planning meals</div>
+      </div>`;
+    return;
+  }
+
+  const dates = getTripDates(trip);
+  document.getElementById('nut-trip-info').textContent = `${trip.name} · ${dates.length} days`;
   
-  document.getElementById('nut-daily-cal').textContent = dailyCal.toLocaleString();
-  document.getElementById('nut-total-cal').textContent = totalCal.toLocaleString();
+  // Show countdown
+  if (trip.startDate) {
+    const start = new Date(trip.startDate + 'T00:00:00');
+    const now = new Date();
+    now.setHours(0,0,0,0);
+    const daysUntil = Math.ceil((start - now) / 86400000);
+    if (daysUntil >= 0) {
+      document.getElementById('nut-countdown').style.display = 'block';
+      document.getElementById('nut-countdown-days').textContent = daysUntil === 0 ? 'TODAY!' : 
+        daysUntil === 1 ? '1 day' : `${daysUntil} days`;
+    } else {
+      document.getElementById('nut-countdown').style.display = 'none';
+    }
+  }
+
+  // Initialize trip.nutrition if needed
+  if (!trip.nutrition) {
+    trip.nutrition = { meals: {}, waterPerDay: 0 };
+    save();
+  }
+
+  autoCalcWater();
+  renderNutritionDays();
+}
+
+async function autoCalcWater() {
+  const trip = getActiveTrip();
+  if (!trip || !trip.waypoints || !trip.waypoints.length) {
+    document.getElementById('nut-water-daily').textContent = '—';
+    document.getElementById('nut-water-source').textContent = 'No route planned';
+    return;
+  }
+
+  const weight = parseFloat(document.getElementById('nut-weight').value) || 180;
+  const weightKg = weight * 0.453592;
   
-  if (trip) {
-    document.getElementById('nut-trip-info').textContent = `${trip.name} · ${days} days`;
+  // Base water: 33ml per kg body weight
+  let baseWater = weightKg * 0.033;
+  
+  // Try to get average temp from weather
+  const lat = trip.waypoints[0].lat;
+  const lng = trip.waypoints[0].lng;
+  const dates = getTripDates(trip);
+  
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&daily=temperature_2m_max&temperature_unit=fahrenheit&timezone=auto&forecast_days=14`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    
+    // Get temps for trip days
+    let temps = [];
+    dates.forEach(date => {
+      const idx = data.daily.time.indexOf(date);
+      if (idx >= 0) temps.push(data.daily.temperature_2m_max[idx]);
+    });
+    
+    const avgTemp = temps.length ? temps.reduce((a,b)=>a+b,0) / temps.length : 75;
+    
+    // Add for temperature
+    let tempAdj = 0;
+    if (avgTemp > 85) tempAdj = 1.5;
+    else if (avgTemp > 75) tempAdj = 1.0;
+    else if (avgTemp > 60) tempAdj = 0.5;
+    
+    // Add for 6hrs paddling activity
+    const activityWater = 6 * 0.25;
+    
+    const totalWater = baseWater + activityWater + tempAdj;
+    
+    document.getElementById('nut-water-daily').textContent = totalWater.toFixed(1) + ' L';
+    document.getElementById('nut-water-source').textContent = `Weight: ${weight}lbs · Avg temp: ${Math.round(avgTemp)}°F`;
+    
+    trip.nutrition.waterPerDay = totalWater;
+    save();
+    
+  } catch {
+    // Fallback
+    const totalWater = baseWater + 1.5 + 1.0;
+    document.getElementById('nut-water-daily').textContent = totalWater.toFixed(1) + ' L';
+    document.getElementById('nut-water-source').textContent = `Based on ${weight}lbs (weather unavailable)`;
   }
 }
 
-function updateWaterCalc() {
+function renderNutritionDays() {
   const trip = getActiveTrip();
-  const days = trip ? getTripDates(trip).length : 5;
-  const base = parseFloat(document.getElementById('water-base').value);
-  const hours = parseFloat(document.getElementById('water-hours').value);
-  const temp = parseFloat(document.getElementById('water-temp').value);
+  if (!trip) return;
   
-  const dailyLiters = base + (hours * 0.25) + temp;
-  const dailyGal = dailyLiters * 0.264172;
-  const dailyWeight = dailyLiters * 2.2; // 1L ≈ 1kg ≈ 2.2 lbs
+  const dates = getTripDates(trip);
+  const goal = parseInt(document.getElementById('nut-cal-goal').value) || 4200;
   
-  document.getElementById('water-daily').textContent = dailyLiters.toFixed(1) + ' L';
-  document.getElementById('water-daily-gal').textContent = `(${dailyGal.toFixed(1)} gal)`;
-  document.getElementById('water-weight').textContent = dailyWeight.toFixed(1) + ' lbs';
+  if (!trip.nutrition.meals) trip.nutrition.meals = {};
+  
+  let totalFoodWeight = 0;
+  let html = '<div style="max-width:1200px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px">';
+  
+  dates.forEach((date, dayIdx) => {
+    const dayNum = dayIdx + 1;
+    const dayKey = `day${dayNum}`;
+    if (!trip.nutrition.meals[dayKey]) trip.nutrition.meals[dayKey] = {};
+    
+    const meals = trip.nutrition.meals[dayKey];
+    let dayTotal = 0;
+    let dayWeight = 0;
+    
+    Object.keys(meals).forEach(cat => {
+      meals[cat].forEach(m => {
+        dayTotal += m.calories;
+        dayWeight += m.weight || (m.calories / 2000); // rough est: 1lb = 2000cal
+      });
+    });
+    
+    totalFoodWeight += dayWeight;
+    
+    const pct = Math.min(100, (dayTotal / goal) * 100);
+    const barColor = dayTotal >= goal * 0.9 ? 'var(--green)' : dayTotal >= goal * 0.7 ? 'var(--amber)' : 'var(--red)';
+    
+    const dt = new Date(date + 'T12:00:00');
+    
+    html += `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--cyan)">Day ${dayNum}</div>
+          <div style="font-size:10px;color:var(--muted)">${dt.toLocaleDateString('en',{weekday:'long',month:'short',day:'numeric'})}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:16px;font-weight:800;font-family:var(--mono);color:${barColor}">${dayTotal}</div>
+          <div style="font-size:9px;color:var(--muted)">/ ${goal} cal</div>
+        </div>
+      </div>
+      
+      <div style="background:var(--bg);border-radius:6px;height:6px;margin-bottom:12px">
+        <div style="height:6px;border-radius:6px;background:${barColor};width:${pct}%;transition:width 0.3s"></div>
+      </div>
+      
+      ${renderMealCategory(dayKey, 'breakfast', '🍳', meals)}
+      ${renderMealCategory(dayKey, 'lunch', '🥪', meals)}
+      ${renderMealCategory(dayKey, 'dinner', '🍝', meals)}
+      ${renderMealCategory(dayKey, 'snacks', '🍫', meals)}
+      
+      <div style="margin-top:10px;font-size:9px;color:var(--dim);text-align:right">
+        Est. weight: ${dayWeight.toFixed(1)} lbs
+      </div>
+    </div>`;
+  });
+  
+  html += '</div>';
+  document.getElementById('nut-days-container').innerHTML = html;
+  document.getElementById('nut-total-weight').textContent = totalFoodWeight.toFixed(1) + ' lbs';
+  document.getElementById('nut-total-weight-sub').textContent = `Across ${dates.length} days`;
 }
 
-function addMeal(category) {
-  const item = prompt(`Add item to ${category}:`);
-  if (!item) return;
-  const cal = parseInt(prompt('Calories:') || '200');
-  const container = document.getElementById(`meals-${category}`);
-  container.innerHTML += `<div>• ${item} (${cal} cal)</div>`;
-  toast(`Added ${item} to ${category}`);
+function renderMealCategory(dayKey, category, emoji, meals) {
+  const items = meals[category] || [];
+  const total = items.reduce((sum, m) => sum + m.calories, 0);
+  
+  return `<div style="margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-size:11px;font-weight:700;color:var(--text)">${emoji} ${category.charAt(0).toUpperCase() + category.slice(1)}</span>
+      <div style="display:flex;gap:4px;align-items:center">
+        <span style="font-size:10px;font-family:var(--mono);color:var(--muted)">${total} cal</span>
+        <button onclick="addMealToDay('${dayKey}','${category}')" style="background:transparent;border:1px solid var(--b2);color:var(--cyan);border-radius:4px;padding:2px 6px;font-size:9px;cursor:pointer">+</button>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);line-height:1.4">
+      ${items.length ? items.map((m,i) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">
+        <span>• ${m.name}</span>
+        <div style="display:flex;gap:4px;align-items:center">
+          <span style="font-family:var(--mono)">${m.calories}cal</span>
+          <button onclick="removeMealFromDay('${dayKey}','${category}',${i})" style="background:transparent;border:none;color:var(--dim);font-size:12px;cursor:pointer">×</button>
+        </div>
+      </div>`).join('') : '<div style="opacity:0.5">No items added</div>'}
+    </div>
+  </div>`;
 }
 
-function generateShoppingList() {
+function addMealToDay(dayKey, category) {
   const trip = getActiveTrip();
-  if (!trip) { toast('Create a trip first'); return; }
-  const days = getTripDates(trip).length;
+  if (!trip) return;
   
-  alert(`Shopping List for ${days} days:\n\n` +
-    `BREAKFAST x${days}:\n` +
-    `• Oatmeal packets x${days}\n` +
-    `• Granola x${days}\n` +
-    `• Coffee x${days}\n\n` +
-    `LUNCH x${days}:\n` +
-    `• Trail mix x${days}\n` +
-    `• Energy bars x${days * 3}\n` +
-    `• Jerky x${days}\n\n` +
-    `DINNER x${days}:\n` +
-    `• Freeze-dried meals x${days}\n` +
-    `• Instant potatoes x${days}\n\n` +
-    `SNACKS x${days}:\n` +
-    `• Chocolate bars x${days}\n` +
-    `• Peanut butter packets x${days * 2}\n\n` +
-    `WATER:\n` +
-    `• ${(5.5 * days).toFixed(1)} L total\n` +
-    `• ${((5.5 * days) * 2.2).toFixed(1)} lbs\n\n` +
-    `📦 Total Food Weight: ~${(2.0 * days).toFixed(1)} lbs`
-  );
+  const name = prompt(`Add ${category} item:`);
+  if (!name) return;
+  
+  const calories = parseInt(prompt('Calories:') || '200');
+  
+  if (!trip.nutrition.meals[dayKey][category]) trip.nutrition.meals[dayKey][category] = [];
+  trip.nutrition.meals[dayKey][category].push({ name, calories });
+  
+  save();
+  renderNutritionDays();
+  toast(`Added ${name} to ${category}`);
+}
+
+function removeMealFromDay(dayKey, category, idx) {
+  const trip = getActiveTrip();
+  if (!trip) return;
+  
+  trip.nutrition.meals[dayKey][category].splice(idx, 1);
+  save();
+  renderNutritionDays();
+}
+
+function exportShoppingList() {
+  const trip = getActiveTrip();
+  if (!trip || !trip.nutrition || !trip.nutrition.meals) {
+    toast('Add meals first'); 
+    return;
+  }
+  
+  const dates = getTripDates(trip);
+  const allItems = {};
+  
+  // Aggregate all items
+  dates.forEach((date, idx) => {
+    const dayKey = `day${idx+1}`;
+    const dayMeals = trip.nutrition.meals[dayKey] || {};
+    
+    Object.keys(dayMeals).forEach(cat => {
+      (dayMeals[cat] || []).forEach(item => {
+        if (!allItems[item.name]) allItems[item.name] = { count: 0, calories: item.calories };
+        allItems[item.name].count++;
+      });
+    });
+  });
+  
+  let text = `SHOPPING LIST\n`;
+  text += `═══════════════════════════════════════\n`;
+  text += `Trip: ${trip.name}\n`;
+  text += `Days: ${dates.length}\n\n`;
+  
+  Object.keys(allItems).sort().forEach(name => {
+    const item = allItems[name];
+    text += `• ${name} x${item.count} (${item.calories}cal each)\n`;
+  });
+  
+  text += `\nWATER: ${(trip.nutrition.waterPerDay * dates.length).toFixed(1)} L total\n`;
+  text += `Generated by Paddle Planner\n`;
+  
+  navigator.clipboard.writeText(text).then(() => {
+    toast('📋 Shopping list copied to clipboard!');
+  }).catch(() => {
+    alert(text);
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
