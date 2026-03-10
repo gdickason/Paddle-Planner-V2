@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 :root {
   --bg:      #020c1a;
@@ -1429,12 +1430,6 @@ function setWxDay(i) {
   renderWxTripDays();
 }
 
-function toggleWxWind() {
-  wxShowWind = !wxShowWind;
-  renderWxDayTabs();
-  renderWxWindArrows();
-}
-
 function renderWxData() {
   if (!wxData) return;
   const scroll = document.getElementById('wx-data-scroll');
@@ -1842,8 +1837,7 @@ function renderDashboard() {
     document.getElementById('dash-mission-control').style.display = haswps ? 'grid' : 'none';
     
     if (haswps) {
-      initDashMap();
-      setTimeout(() => { refreshDashMap(); generateFloatPlan(); }, 100);
+      setTimeout(() => { initDashMap(); generateFloatPlan(); }, 100);
     }
   }
   renderTripList();
@@ -2356,13 +2350,21 @@ function renderNutritionDays() {
 function renderMealCategory(dayKey, category, emoji, meals) {
   const items = meals[category] || [];
   const total = items.reduce((sum, m) => sum + m.calories, 0);
-  
+  const formId = `meal-form-${dayKey}-${category}`;
+
   return `<div style="margin-bottom:8px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <span style="font-size:11px;font-weight:700;color:var(--text)">${emoji} ${category.charAt(0).toUpperCase() + category.slice(1)}</span>
       <div style="display:flex;gap:4px;align-items:center">
         <span style="font-size:10px;font-family:var(--mono);color:var(--muted)">${total} cal</span>
-        <button onclick="addMealToDay('${dayKey}','${category}')" style="background:transparent;border:1px solid var(--b2);color:var(--cyan);border-radius:4px;padding:2px 6px;font-size:9px;cursor:pointer">+</button>
+        <button onclick="toggleMealForm('${formId}')" style="background:transparent;border:1px solid var(--b2);color:var(--cyan);border-radius:4px;padding:2px 6px;font-size:9px;cursor:pointer">+</button>
+      </div>
+    </div>
+    <div id="${formId}" style="display:none;margin-bottom:6px;display:none">
+      <div style="display:flex;gap:4px">
+        <input id="${formId}-name" placeholder="Item name" style="flex:1;font-size:10px;padding:4px 6px">
+        <input id="${formId}-cal" placeholder="Cal" type="number" min="0" style="width:60px;font-size:10px;padding:4px 6px">
+        <button onclick="submitMeal('${dayKey}','${category}','${formId}')" style="background:var(--cyan);border:none;color:var(--bg);border-radius:4px;padding:4px 8px;font-size:10px;font-weight:700;cursor:pointer">Add</button>
       </div>
     </div>
     <div style="font-size:10px;color:var(--muted);line-height:1.4">
@@ -2377,22 +2379,31 @@ function renderMealCategory(dayKey, category, emoji, meals) {
   </div>`;
 }
 
-function addMealToDay(dayKey, category) {
+function toggleMealForm(formId) {
+  const el = document.getElementById(formId);
+  if (!el) return;
+  const isHidden = el.style.display === 'none' || el.style.display === '';
+  el.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) setTimeout(() => document.getElementById(formId + '-name')?.focus(), 50);
+}
+
+function submitMeal(dayKey, category, formId) {
   const trip = getActiveTrip();
   if (!trip) return;
-  
-  const name = prompt(`Add ${category} item:`);
-  if (!name) return;
-  
-  const calories = parseInt(prompt('Calories:') || '200');
-  
+  const nameEl = document.getElementById(formId + '-name');
+  const calEl  = document.getElementById(formId + '-cal');
+  const name = nameEl?.value.trim();
+  if (!name) { toast('⚠ Enter item name'); return; }
+  const calories = Math.max(0, parseInt(calEl?.value) || 0);
+  if (!trip.nutrition.meals[dayKey]) trip.nutrition.meals[dayKey] = {};
   if (!trip.nutrition.meals[dayKey][category]) trip.nutrition.meals[dayKey][category] = [];
   trip.nutrition.meals[dayKey][category].push({ name, calories });
-  
   save();
   renderNutritionDays();
-  toast(`Added ${name} to ${category}`);
+  toast(`Added ${name} (${calories} cal)`);
 }
+window.toggleMealForm = toggleMealForm;
+window.submitMeal = submitMeal;
 
 function removeMealFromDay(dayKey, category, idx) {
   const trip = getActiveTrip();
@@ -2452,57 +2463,61 @@ function exportShoppingList() {
 
 let dashMap = null;
 let dashMapInit = false;
+let dashMapPolylines = [];
+let dashMapMarkers = [];
 
 function initDashMap() {
-  if (dashMapInit) return;
   const container = document.getElementById('dash-map');
   if (!container) return;
-  
-  dashMap = L.map('dash-map', { zoomControl: false }).setView([36.8, -76.0], 8);
-  makeTiles().addTo(dashMap);
-  makeSeamark().addTo(dashMap);
+  // If already initialized, just resize and refresh
+  if (dashMapInit && dashMap) {
+    setTimeout(() => { dashMap.invalidateSize(); refreshDashMap(); }, 50);
+    return;
+  }
   dashMapInit = true;
+  dashMap = L.map('dash-map', {
+    zoomControl: false,
+    dragging: false,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+    touchZoom: false,
+  }).setView([36.8, -76.0], 8);
+  makeTiles().satellite.addTo(dashMap);
+  makeSeamark().addTo(dashMap);
+  // Allow map to size itself, then draw route
+  setTimeout(() => { dashMap.invalidateSize(); refreshDashMap(); }, 150);
 }
 
 function refreshDashMap() {
-  if (!dashMapInit) initDashMap();
   if (!dashMap) return;
-  
   const trip = getActiveTrip();
   if (!trip || !trip.waypoints || trip.waypoints.length === 0) return;
-  
-  // Clear existing layers
-  dashMap.eachLayer(layer => {
-    if (layer instanceof L.Polyline || layer instanceof L.Marker) {
-      dashMap.removeLayer(layer);
-    }
-  });
-  
+
+  // Clear only tracked layers (safe — won't touch tile layers)
+  dashMapPolylines.forEach(l => dashMap.removeLayer(l));
+  dashMapMarkers.forEach(l => dashMap.removeLayer(l));
+  dashMapPolylines = [];
+  dashMapMarkers = [];
+
   const wps = trip.waypoints;
-  
-  // Add route line
   const coords = wps.map(w => [w.lat, w.lng]);
-  L.polyline(coords, { color: '#22d3ee', weight: 3, opacity: 0.8 }).addTo(dashMap);
-  
-  // Add markers
+
+  const line = L.polyline(coords, { color: '#22d3ee', weight: 3, opacity: 0.8 });
+  line.addTo(dashMap);
+  dashMapPolylines.push(line);
+
   wps.forEach((wp, i) => {
-    const isStart = i === 0;
-    const isEnd = i === wps.length - 1;
+    const isStart = i === 0, isEnd = i === wps.length - 1;
     const color = isStart ? '#4ade80' : isEnd ? '#f87171' : '#22d3ee';
     const icon = L.divIcon({
       html: `<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid #020c1a"></div>`,
-      className: '',
-      iconSize: [12, 12],
-      iconAnchor: [6, 6]
+      className: '', iconSize: [12,12], iconAnchor: [6,6]
     });
-    L.marker([wp.lat, wp.lng], { icon }).addTo(dashMap);
+    const m = L.marker([wp.lat, wp.lng], { icon }).addTo(dashMap);
+    dashMapMarkers.push(m);
   });
-  
-  // Fit bounds
-  if (wps.length > 0) {
-    const bounds = L.latLngBounds(coords);
-    dashMap.fitBounds(bounds, { padding: [20, 20] });
-  }
+
+  dashMap.fitBounds(L.latLngBounds(coords), { padding: [20, 20] });
 }
 
 function generateFloatPlan() {
@@ -2605,6 +2620,5 @@ document.addEventListener('DOMContentLoaded', function() {
   showPage('dashboard');
 });
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </body>
 </html>
