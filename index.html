@@ -365,6 +365,7 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
       <button class="nav-tab" data-page="route"><span class="tab-icon">🗺</span>Route</button>
       <button class="nav-tab" data-page="weather"><span class="tab-icon">🌊</span>Weather</button>
       <button class="nav-tab" data-page="gear"><span class="tab-icon">🎒</span>Gear</button>
+      <button class="nav-tab" data-page="nutrition"><span class="tab-icon">🍎</span>Nutrition</button>
       <button class="nav-tab" data-page="campsites"><span class="tab-icon">⛺</span>Campsites</button>
     </div>
     <div class="nav-spacer"></div>
@@ -433,6 +434,29 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
               <div class="qs-card">
                 <div><div class="qs-label">Campsites</div><div class="qs-value" id="qs-camps">0</div><div class="qs-sub" id="qs-camps-sub"></div></div>
                 <button class="qs-btn" onclick="showPage('campsites')">Log →</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mission Control -->
+          <div style="margin-top:20px;display:grid;grid-template-columns:1.2fr 1fr;gap:16px" id="dash-mission-control">
+            <!-- Route Map Preview -->
+            <div class="card" style="padding:0;overflow:hidden">
+              <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:12px;font-weight:700;color:var(--cyan)">🗺️ Route Overview</div>
+                <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="showPage('route')">Plan Route →</button>
+              </div>
+              <div id="dash-map" style="height:280px;background:var(--bg)"></div>
+            </div>
+
+            <!-- Float Plan -->
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <div style="font-size:12px;font-weight:700;color:var(--cyan)">📋 Float Plan</div>
+                <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="exportFloatPlan()">Export</button>
+              </div>
+              <div id="dash-float-plan" style="max-height:240px;overflow-y:auto;font-size:11px;line-height:1.6">
+                <div style="color:var(--muted);font-style:italic">Plan your route to generate float plan</div>
               </div>
             </div>
           </div>
@@ -575,6 +599,174 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
           </select>
           <label class="ess-label"><input type="checkbox" id="gear-new-ess"> Essential</label>
           <button class="btn-amber" id="gear-add-item-btn" style="padding:7px 16px;flex-shrink:0;white-space:nowrap">Add</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NUTRITION PLANNER -->
+    <div class="page" id="page-nutrition">
+      <div style="display:flex;flex-direction:column;height:100%;overflow:hidden">
+        <!-- Top Bar -->
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-size:18px;font-weight:700;color:var(--text)">🍎 Nutrition Planner</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px" id="nut-trip-info">Select a trip to plan nutrition</div>
+            </div>
+            <button class="btn-primary" onclick="generateShoppingList()">🛒 Shopping List</button>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div style="flex:1;overflow-y:auto;padding:20px">
+          <div style="max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            
+            <!-- Left Column: Calculator & Water -->
+            <div>
+              <!-- Calorie Calculator -->
+              <div class="card" style="margin-bottom:16px">
+                <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--cyan)">📊 Daily Calorie Needs</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+                  <div>
+                    <label>Body Weight (lbs)</label>
+                    <input type="number" id="nut-weight" value="180" onchange="updateNutritionCalc()">
+                  </div>
+                  <div>
+                    <label>Activity Level</label>
+                    <select id="nut-activity" onchange="updateNutritionCalc()">
+                      <option value="3500">Moderate (3500 cal/day)</option>
+                      <option value="4200" selected>High (4200 cal/day)</option>
+                      <option value="5000">Extreme (5000 cal/day)</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="background:var(--bg);border-radius:8px;padding:12px;border:1px solid var(--border)">
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Daily Calories</div>
+                      <div style="font-size:24px;font-weight:800;font-family:var(--mono);color:var(--cyan)" id="nut-daily-cal">4,200</div>
+                    </div>
+                    <div>
+                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Trip Total</div>
+                      <div style="font-size:24px;font-weight:800;font-family:var(--mono);color:var(--amber)" id="nut-total-cal">21,000</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Water Calculator -->
+              <div class="card">
+                <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--cyan)">💧 Water Planning</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+                  <div>
+                    <label>Base water/day (L)</label>
+                    <input type="number" id="water-base" value="3.5" step="0.5" onchange="updateWaterCalc()">
+                  </div>
+                  <div>
+                    <label>Paddle hours/day</label>
+                    <input type="number" id="water-hours" value="6" step="0.5" onchange="updateWaterCalc()">
+                  </div>
+                </div>
+                <div style="margin-bottom:12px">
+                  <label>Temperature</label>
+                  <select id="water-temp" onchange="updateWaterCalc()">
+                    <option value="0">Cool (&lt;60°F)</option>
+                    <option value="0.5">Moderate (60-75°F)</option>
+                    <option value="1" selected>Warm (75-85°F)</option>
+                    <option value="1.5">Hot (&gt;85°F)</option>
+                  </select>
+                </div>
+                <div style="background:var(--bg);border-radius:8px;padding:12px;border:1px solid var(--border)">
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Daily Water</div>
+                      <div style="font-size:20px;font-weight:800;font-family:var(--mono);color:var(--cyan)" id="water-daily">5.5 L</div>
+                      <div style="font-size:9px;color:var(--muted)" id="water-daily-gal">(1.5 gal)</div>
+                    </div>
+                    <div>
+                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Weight/Day</div>
+                      <div style="font-size:20px;font-weight:800;font-family:var(--mono);color:var(--amber)" id="water-weight">12.1 lbs</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column: Meal Planning -->
+            <div>
+              <div class="card">
+                <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--cyan)">🍽️ Daily Meal Plan</div>
+                
+                <!-- Breakfast -->
+                <div style="margin-bottom:16px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <span style="font-size:12px;font-weight:700;color:var(--text)">Breakfast (800 cal)</span>
+                    <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="addMeal('breakfast')">+ Add</button>
+                  </div>
+                  <div id="meals-breakfast" style="font-size:11px;color:var(--muted)">
+                    <div>• Instant Oatmeal (300 cal)</div>
+                    <div>• Granola & Nuts (250 cal)</div>
+                    <div>• Coffee + Powdered Milk (150 cal)</div>
+                    <div>• Energy Bar (200 cal)</div>
+                  </div>
+                </div>
+
+                <!-- Lunch -->
+                <div style="margin-bottom:16px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <span style="font-size:12px;font-weight:700;color:var(--text)">Lunch (1000 cal)</span>
+                    <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="addMeal('lunch')">+ Add</button>
+                  </div>
+                  <div id="meals-lunch" style="font-size:11px;color:var(--muted)">
+                    <div>• Trail Mix (600 cal)</div>
+                    <div>• Jerky (100 cal)</div>
+                    <div>• Energy Bars x2 (300 cal)</div>
+                  </div>
+                </div>
+
+                <!-- Dinner -->
+                <div style="margin-bottom:16px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <span style="font-size:12px;font-weight:700;color:var(--text)">Dinner (1400 cal)</span>
+                    <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="addMeal('dinner')">+ Add</button>
+                  </div>
+                  <div id="meals-dinner" style="font-size:11px;color:var(--muted)">
+                    <div>• Freeze-dried Pasta (600 cal)</div>
+                    <div>• Instant Potatoes (300 cal)</div>
+                    <div>• Cheese (200 cal)</div>
+                    <div>• Chocolate Bar (300 cal)</div>
+                  </div>
+                </div>
+
+                <!-- Snacks -->
+                <div style="margin-bottom:16px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <span style="font-size:12px;font-weight:700;color:var(--text)">Snacks (1000 cal)</span>
+                    <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="addMeal('snacks')">+ Add</button>
+                  </div>
+                  <div id="meals-snacks" style="font-size:11px;color:var(--muted)">
+                    <div>• Dark Chocolate (340 cal)</div>
+                    <div>• Peanut Butter Packets (380 cal)</div>
+                    <div>• Gummy Bears (280 cal)</div>
+                  </div>
+                </div>
+
+                <!-- Total -->
+                <div style="background:var(--bg);border-radius:8px;padding:12px;border:1px solid var(--cyan);margin-top:16px">
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Daily Total</div>
+                      <div style="font-size:20px;font-weight:800;font-family:var(--mono);color:var(--cyan)">4,200 cal</div>
+                    </div>
+                    <div>
+                      <div style="font-size:10px;color:var(--muted);text-transform:uppercase">Food Weight</div>
+                      <div style="font-size:20px;font-weight:800;font-family:var(--mono);color:var(--amber)">~2.0 lbs</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -768,6 +960,7 @@ function showPage(id) {
   if (id==='gear')      renderGear();
   if (id==='dashboard') renderDashboard();
   if (id==='campsites') renderCampsites();
+  if (id==='nutrition') { updateNutritionCalc(); updateWaterCalc(); }
 }
 
 document.querySelectorAll('.nav-tab').forEach(btn => {
@@ -927,6 +1120,12 @@ function refreshRouteMap() {
     const bounds = L.latLngBounds(wps.map(w=>[w.lat,w.lng]));
     if (wps.length === 1) routeMap.setView([wps[0].lat,wps[0].lng], 10);
     else routeMap.fitBounds(bounds, { padding: [50,50] });
+  }
+  
+  // Update dashboard
+  if (dashMapInit) {
+    refreshDashMap();
+    generateFloatPlan();
   }
 }
 
@@ -1738,6 +1937,8 @@ function renderDashboard() {
     renderReadiness(trip);
     loadDashWeather(trip);
     renderQuickStats(trip);
+    initDashMap();
+    setTimeout(() => { refreshDashMap(); generateFloatPlan(); }, 100);
   }
   renderTripList();
 }
@@ -2074,6 +2275,226 @@ document.getElementById('save-camp-form-btn').addEventListener('click', () => {
   if (routeMapInit) refreshRouteMap();
   toast(`⛺ Campsite saved`);
 });
+
+// ═══════════════════════════════════════════════════════════════
+// NUTRITION PLANNER
+// ═══════════════════════════════════════════════════════════════
+
+function updateNutritionCalc() {
+  const trip = getActiveTrip();
+  const days = trip ? getTripDates(trip).length : 5;
+  const dailyCal = parseInt(document.getElementById('nut-activity').value);
+  const totalCal = dailyCal * days;
+  
+  document.getElementById('nut-daily-cal').textContent = dailyCal.toLocaleString();
+  document.getElementById('nut-total-cal').textContent = totalCal.toLocaleString();
+  
+  if (trip) {
+    document.getElementById('nut-trip-info').textContent = `${trip.name} · ${days} days`;
+  }
+}
+
+function updateWaterCalc() {
+  const trip = getActiveTrip();
+  const days = trip ? getTripDates(trip).length : 5;
+  const base = parseFloat(document.getElementById('water-base').value);
+  const hours = parseFloat(document.getElementById('water-hours').value);
+  const temp = parseFloat(document.getElementById('water-temp').value);
+  
+  const dailyLiters = base + (hours * 0.25) + temp;
+  const dailyGal = dailyLiters * 0.264172;
+  const dailyWeight = dailyLiters * 2.2; // 1L ≈ 1kg ≈ 2.2 lbs
+  
+  document.getElementById('water-daily').textContent = dailyLiters.toFixed(1) + ' L';
+  document.getElementById('water-daily-gal').textContent = `(${dailyGal.toFixed(1)} gal)`;
+  document.getElementById('water-weight').textContent = dailyWeight.toFixed(1) + ' lbs';
+}
+
+function addMeal(category) {
+  const item = prompt(`Add item to ${category}:`);
+  if (!item) return;
+  const cal = parseInt(prompt('Calories:') || '200');
+  const container = document.getElementById(`meals-${category}`);
+  container.innerHTML += `<div>• ${item} (${cal} cal)</div>`;
+  toast(`Added ${item} to ${category}`);
+}
+
+function generateShoppingList() {
+  const trip = getActiveTrip();
+  if (!trip) { toast('Create a trip first'); return; }
+  const days = getTripDates(trip).length;
+  
+  alert(`Shopping List for ${days} days:\n\n` +
+    `BREAKFAST x${days}:\n` +
+    `• Oatmeal packets x${days}\n` +
+    `• Granola x${days}\n` +
+    `• Coffee x${days}\n\n` +
+    `LUNCH x${days}:\n` +
+    `• Trail mix x${days}\n` +
+    `• Energy bars x${days * 3}\n` +
+    `• Jerky x${days}\n\n` +
+    `DINNER x${days}:\n` +
+    `• Freeze-dried meals x${days}\n` +
+    `• Instant potatoes x${days}\n\n` +
+    `SNACKS x${days}:\n` +
+    `• Chocolate bars x${days}\n` +
+    `• Peanut butter packets x${days * 2}\n\n` +
+    `WATER:\n` +
+    `• ${(5.5 * days).toFixed(1)} L total\n` +
+    `• ${((5.5 * days) * 2.2).toFixed(1)} lbs\n\n` +
+    `📦 Total Food Weight: ~${(2.0 * days).toFixed(1)} lbs`
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD MAP & FLOAT PLAN
+// ═══════════════════════════════════════════════════════════════
+
+let dashMap = null;
+let dashMapInit = false;
+
+function initDashMap() {
+  if (dashMapInit) return;
+  const container = document.getElementById('dash-map');
+  if (!container) return;
+  
+  dashMap = L.map('dash-map', { zoomControl: false }).setView([36.8, -76.0], 8);
+  makeTiles().addTo(dashMap);
+  makeSeamark().addTo(dashMap);
+  dashMapInit = true;
+}
+
+function refreshDashMap() {
+  if (!dashMapInit) initDashMap();
+  if (!dashMap) return;
+  
+  const trip = getActiveTrip();
+  if (!trip || !trip.waypoints || trip.waypoints.length === 0) return;
+  
+  // Clear existing layers
+  dashMap.eachLayer(layer => {
+    if (layer instanceof L.Polyline || layer instanceof L.Marker) {
+      dashMap.removeLayer(layer);
+    }
+  });
+  
+  const wps = trip.waypoints;
+  
+  // Add route line
+  const coords = wps.map(w => [w.lat, w.lng]);
+  L.polyline(coords, { color: '#22d3ee', weight: 3, opacity: 0.8 }).addTo(dashMap);
+  
+  // Add markers
+  wps.forEach((wp, i) => {
+    const isStart = i === 0;
+    const isEnd = i === wps.length - 1;
+    const color = isStart ? '#4ade80' : isEnd ? '#f87171' : '#22d3ee';
+    const icon = L.divIcon({
+      html: `<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid #020c1a"></div>`,
+      className: '',
+      iconSize: [12, 12],
+      iconAnchor: [6, 6]
+    });
+    L.marker([wp.lat, wp.lng], { icon }).addTo(dashMap);
+  });
+  
+  // Fit bounds
+  if (wps.length > 0) {
+    const bounds = L.latLngBounds(coords);
+    dashMap.fitBounds(bounds, { padding: [20, 20] });
+  }
+}
+
+function generateFloatPlan() {
+  const trip = getActiveTrip();
+  if (!trip || !trip.waypoints || trip.waypoints.length < 2) {
+    document.getElementById('dash-float-plan').innerHTML = '<div style="color:var(--muted);font-style:italic">Plan your route to generate float plan</div>';
+    return;
+  }
+  
+  const wps = trip.waypoints;
+  const dates = getTripDates(trip);
+  
+  let html = `<div style="margin-bottom:12px">
+    <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px">${trip.name}</div>
+    <div style="font-size:10px;color:var(--muted)">${dates[0]} to ${dates[dates.length-1]} · ${dates.length} days</div>
+  </div>`;
+  
+  html += '<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">';
+  html += '<div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px">WAYPOINTS</div>';
+  
+  let totalNm = 0;
+  wps.forEach((wp, i) => {
+    const isStart = i === 0;
+    const isEnd = i === wps.length - 1;
+    const label = isStart ? '🟢 START' : isEnd ? '🔴 FINISH' : `⚓ WP${i}`;
+    
+    let dist = '';
+    if (i > 0) {
+      const nm = nmBetween(wps[i-1], wp);
+      totalNm += nm;
+      dist = ` <span style="color:var(--amber)">+${nm.toFixed(1)}nm</span>`;
+    }
+    
+    html += `<div style="margin-bottom:4px;color:var(--text)">
+      <span style="font-family:var(--mono);font-size:10px">${label}</span> ${wp.name || `${wp.lat.toFixed(4)}, ${wp.lng.toFixed(4)}`}${dist}
+    </div>`;
+  });
+  
+  html += `</div>`;
+  html += `<div style="font-size:10px;margin-top:8px">
+    <div style="color:var(--cyan);font-weight:700">TOTAL DISTANCE</div>
+    <div style="font-size:16px;font-family:var(--mono);color:var(--text);font-weight:700">${totalNm.toFixed(1)} nm</div>
+    <div style="color:var(--muted);font-size:9px">${(totalNm * 1.15078).toFixed(1)} mi · Est. ${(totalNm / 3).toFixed(1)} hrs @ 3 kts</div>
+  </div>`;
+  
+  document.getElementById('dash-float-plan').innerHTML = html;
+}
+
+function exportFloatPlan() {
+  const trip = getActiveTrip();
+  if (!trip) { toast('Create a trip first'); return; }
+  
+  const dates = getTripDates(trip);
+  const wps = trip.waypoints || [];
+  let totalNm = 0;
+  for (let i = 1; i < wps.length; i++) totalNm += nmBetween(wps[i-1], wps[i]);
+  
+  let text = `FLOAT PLAN\n`;
+  text += `═══════════════════════════════════════\n\n`;
+  text += `Trip: ${trip.name}\n`;
+  text += `Area: ${trip.area || 'Not specified'}\n`;
+  text += `Dates: ${dates[0]} to ${dates[dates.length-1]} (${dates.length} days)\n`;
+  text += `Distance: ${totalNm.toFixed(1)} nm (${(totalNm * 1.15078).toFixed(1)} mi)\n\n`;
+  text += `ROUTE\n`;
+  text += `─────────────────────────────────────\n`;
+  
+  wps.forEach((wp, i) => {
+    const isStart = i === 0;
+    const isEnd = i === wps.length - 1;
+    const label = isStart ? 'START' : isEnd ? 'FINISH' : `WP${i}`;
+    let dist = '';
+    if (i > 0) {
+      const nm = nmBetween(wps[i-1], wp);
+      dist = ` (+${nm.toFixed(1)}nm)`;
+    }
+    text += `${label}: ${wp.name || `${wp.lat.toFixed(4)}, ${wp.lng.toFixed(4)}`}${dist}\n`;
+  });
+  
+  text += `\n`;
+  text += `EMERGENCY CONTACTS\n`;
+  text += `─────────────────────────────────────\n`;
+  text += `[To be filled in by user]\n\n`;
+  text += `Generated by Paddle Planner\n`;
+  text += `https://gdickason.github.io/Paddle-Planner-V2/\n`;
+  
+  // Copy to clipboard
+  navigator.clipboard.writeText(text).then(() => {
+    toast('📋 Float plan copied to clipboard!');
+  }).catch(() => {
+    alert(text);
+  });
+}
 
 // ═══════════════════════════════════════════════════════════════
 // BOOT
