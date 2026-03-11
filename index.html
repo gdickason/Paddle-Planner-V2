@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root {
   --bg:      #020c1a;
@@ -419,6 +420,7 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
               </div>
               <div><label>Start Date</label><input id="nf-start" type="date"></div>
               <div><label>End Date</label><input id="nf-end" type="date"></div>
+              <div><label>Participants</label><input id="nf-participants" placeholder="John Doe, Jane Smith (separate with commas)"></div>
             </div>
             <div><label>Notes</label><textarea id="nf-notes" placeholder="Route overview, goals, logistics…" style="min-height:52px;resize:vertical"></textarea></div>
             <div class="form-actions">
@@ -480,10 +482,10 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
               <div class="card">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
                   <div style="font-size:14px;font-weight:700;color:var(--cyan)">📋 Float Plan</div>
-                  <button class="btn-ghost" style="padding:4px 10px;font-size:10px" onclick="exportFloatPlan()">Export</button>
+                  <button class="btn-primary" style="padding:6px 14px;font-size:10px" onclick="exportFloatPlanPDF()">📄 Export PDF</button>
                 </div>
                 <div id="dash-float-plan" style="max-height:340px;overflow-y:auto;font-size:11px;line-height:1.6">
-                  <div style="color:var(--muted);font-style:italic">Plan your route to generate float plan</div>
+                  <div style="color:var(--muted);font-style:italic">Plan your route to generate comprehensive float plan</div>
                 </div>
               </div>
 
@@ -1378,7 +1380,7 @@ function renderSidebar() {
       <div class="wp-day-group-header">
         <div class="wp-day-group-dot" style="background:${dayColor}"></div>
         <span class="wp-day-group-label" style="color:${dayColor}">${dayLabel}</span>
-        ${dayNm > 0.05 ? `<span class="wp-day-group-dist">${dayNm.toFixed(1)}nm</span>` : ''}
+        ${dayNm > 0.05 ? `<span class="wp-day-group-dist" style="font-size:11px;font-weight:700">${dayNm.toFixed(1)} nm<span style="font-size:8px;opacity:0.7;margin-left:4px">${(dayNm*1.15078).toFixed(1)}mi</span></span>` : ''}
       </div>`;
 
     items.forEach(({ wp, idx }) => {
@@ -2013,14 +2015,28 @@ function buildCurrentArrowSVG(dir, speed, col) {
 
 function getTripDates(trip) {
   if (!trip?.startDate) return [];
-  // V2 FIX: Ensure Day 1 = Start Date, Last Day = End Date
-  const start = new Date(trip.startDate+'T00:00:00');
-  const end   = trip.endDate ? new Date(trip.endDate+'T00:00:00') : new Date(start.getTime()+6*86400000);
+  // V3 FIX: Bulletproof date generation - NO TIMEZONE ISSUES
+  // If trip is May 20-22, we want EXACTLY ['2024-05-20', '2024-05-21', '2024-05-22']
+  const start = trip.startDate; // Already in YYYY-MM-DD format
+  const end = trip.endDate || start;
+  
   const dates = [];
-  // Include both start and end dates (inclusive range)
-  for (let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) {
-    dates.push(d.toISOString().split('T')[0]);
+  const [startY, startM, startD] = start.split('-').map(Number);
+  const [endY, endM, endD] = end.split('-').map(Number);
+  
+  // Create dates at noon to avoid any timezone weirdness
+  const startDate = new Date(startY, startM - 1, startD, 12, 0, 0);
+  const endDate = new Date(endY, endM - 1, endD, 12, 0, 0);
+  
+  const current = new Date(startDate);
+  while (current <= endDate) {
+    const y = current.getFullYear();
+    const m = String(current.getMonth() + 1).padStart(2, '0');
+    const d = String(current.getDate()).padStart(2, '0');
+    dates.push(`${y}-${m}-${d}`);
+    current.setDate(current.getDate() + 1);
   }
+  
   return dates;
 }
 
@@ -2273,6 +2289,7 @@ document.getElementById('create-trip-btn').addEventListener('click', () => {
     area:      document.getElementById('nf-area').value.trim(),
     startDate: document.getElementById('nf-start').value,
     endDate:   document.getElementById('nf-end').value,
+    participants: document.getElementById('nf-participants').value.trim(),
     notes:     document.getElementById('nf-notes').value,
     waypoints: [],
     createdAt: new Date().toISOString(),
@@ -2281,7 +2298,7 @@ document.getElementById('create-trip-btn').addEventListener('click', () => {
   state.activeTripId = trip.id;
   save();
   document.getElementById('new-trip-form').style.display = 'none';
-  ['nf-name','nf-area','nf-start','nf-end','nf-notes'].forEach(id=>document.getElementById(id).value='');
+  ['nf-name','nf-area','nf-start','nf-end','nf-participants','nf-notes'].forEach(id=>document.getElementById(id).value='');
   renderDashboard();
   toast(`🛶 ${trip.name} created!`);
 });
@@ -2890,92 +2907,317 @@ function analyzeExposure(avgWind, numWaypoints) {
 function generateFloatPlan() {
   const trip = getActiveTrip();
   if (!trip || !trip.waypoints || trip.waypoints.length < 2) {
-    document.getElementById('dash-float-plan').innerHTML = '<div style="color:var(--muted);font-style:italic">Plan your route to generate float plan</div>';
+    document.getElementById('dash-float-plan').innerHTML = '<div style="color:var(--muted);font-style:italic">Plan your route to generate comprehensive float plan</div>';
     return;
   }
   
   const wps = trip.waypoints;
   const dates = getTripDates(trip);
+  const campsites = state.campsites;
   
-  let html = `<div style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px">${trip.name}</div>
-    <div style="font-size:10px;color:var(--muted)">${dates[0]} to ${dates[dates.length-1]} · ${dates.length} days</div>
-  </div>`;
-  
-  html += '<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">';
-  html += '<div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:6px">WAYPOINTS</div>';
-  
-  let totalNm = 0;
-  wps.forEach((wp, i) => {
-    const isStart = i === 0;
-    const isEnd = i === wps.length - 1;
-    const label = isStart ? '🟢 START' : isEnd ? '🔴 FINISH' : `⚓ WP${i}`;
-    
-    let dist = '';
-    if (i > 0) {
-      const nm = nmBetween(wps[i-1], wp);
-      totalNm += nm;
-      dist = ` <span style="color:var(--amber)">+${nm.toFixed(1)}nm</span>`;
-    }
-    
-    html += `<div style="margin-bottom:4px;color:var(--text)">
-      <span style="font-family:var(--mono);font-size:10px">${label}</span> ${wp.name || `${wp.lat.toFixed(4)}, ${wp.lng.toFixed(4)}`}${dist}
-    </div>`;
+  // Group waypoints by day
+  const dayGroups = {};
+  wps.forEach(wp => {
+    const day = wp.day || 1;
+    if (!dayGroups[day]) dayGroups[day] = [];
+    dayGroups[day].push(wp);
   });
   
-  html += `</div>`;
-  html += `<div style="font-size:10px;margin-top:8px">
-    <div style="color:var(--cyan);font-weight:700">TOTAL DISTANCE</div>
-    <div style="font-size:16px;font-family:var(--mono);color:var(--text);font-weight:700">${totalNm.toFixed(1)} nm</div>
-    <div style="color:var(--muted);font-size:9px">${(totalNm * 1.15078).toFixed(1)} mi · Est. ${(totalNm / 3).toFixed(1)} hrs @ 3 kts</div>
-  </div>`;
+  // Calculate compass heading between two points
+  const getHeading = (from, to) => {
+    const lat1 = from.lat * Math.PI / 180;
+    const lat2 = to.lat * Math.PI / 180;
+    const dLon = (to.lng - from.lng) * Math.PI / 180;
+    const y = Math.sin(dLon) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    const bearing = Math.atan2(y, x) * 180 / Math.PI;
+    return (bearing + 360) % 360;
+  };
+  
+  const getCardinal = (deg) => {
+    const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+    return dirs[Math.round(deg / 22.5) % 16];
+  };
+  
+  // Build comprehensive float plan
+  let html = `
+    <div style="background:var(--bg);border:1.5px solid var(--cyan);border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:800;color:var(--cyan);margin-bottom:8px">📋 EXPEDITION FLOAT PLAN</div>
+      <div style="font-size:11px;color:var(--text);margin-bottom:4px"><b>${trip.name}</b></div>
+      <div style="font-size:10px;color:var(--muted)">${trip.area || 'Not specified'}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${dates[0]} to ${dates[dates.length-1]} (${dates.length} day${dates.length>1?'s':''})</div>
+      ${trip.participants ? `<div style="font-size:10px;color:var(--text);margin-top:6px"><b>Participants:</b> ${trip.participants}</div>` : ''}
+    </div>
+  `;
+  
+  // Day-by-day breakdown
+  const sortedDays = Object.keys(dayGroups).map(Number).sort((a,b)=>a-b);
+  let totalNm = 0;
+  
+  sortedDays.forEach(dayNum => {
+    const dayWps = dayGroups[dayNum];
+    const dateStr = dates[dayNum-1] ? new Date(dates[dayNum-1]+'T12:00:00').toLocaleDateString('en',{weekday:'long',month:'short',day:'numeric'}) : `Day ${dayNum}`;
+    
+    // Calculate day distance
+    let dayDist = 0;
+    for (let i=1; i<dayWps.length; i++) {
+      dayDist += nmBetween(dayWps[i-1], dayWps[i]);
+    }
+    totalNm += dayDist;
+    
+    // Find campsites for this day
+    const dayCamps = campsites.filter(c => dayWps.some(wp => 
+      Math.abs(wp.lat - c.lat) < 0.01 && Math.abs(wp.lng - c.lng) < 0.01
+    ));
+    
+    html += `
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--cyan)">Day ${dayNum}</div>
+            <div style="font-size:9px;color:var(--muted)">${dateStr}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:14px;font-weight:800;color:var(--amber);font-family:var(--mono)">${dayDist.toFixed(1)} nm</div>
+            <div style="font-size:8px;color:var(--muted)">${(dayDist*1.15078).toFixed(1)} mi</div>
+          </div>
+        </div>
+        
+        <!-- Waypoints & Navigation -->
+        <div style="margin-bottom:10px">
+          <div style="font-size:9px;color:var(--dim);text-transform:uppercase;margin-bottom:6px">Navigation</div>
+          ${dayWps.map((wp, i) => {
+            const isLast = i === dayWps.length - 1;
+            let navInfo = '';
+            if (!isLast) {
+              const nextWp = dayWps[i+1];
+              const dist = nmBetween(wp, nextWp);
+              const heading = getHeading(wp, nextWp);
+              const cardinal = getCardinal(heading);
+              navInfo = `<div style="font-size:9px;color:var(--amber);margin-top:2px">→ ${cardinal} (${Math.round(heading)}°) · ${dist.toFixed(1)} nm</div>`;
+            }
+            return `<div style="margin-bottom:6px">
+              <div style="font-size:10px;color:var(--text)">${i===0?'🟢':'⚓'} <b>${wp.name || wp.lat.toFixed(4)+', '+wp.lng.toFixed(4)}</b></div>
+              ${navInfo}
+            </div>`;
+          }).join('')}
+        </div>
+        
+        <!-- Campsites -->
+        ${dayCamps.length ? `
+          <div style="border-top:1px solid var(--border);padding-top:8px">
+            <div style="font-size:9px;color:var(--dim);text-transform:uppercase;margin-bottom:6px">Campsites</div>
+            ${dayCamps.map(c => `
+              <div style="font-size:10px;color:var(--text);margin-bottom:4px">
+                ⛺ <b>${c.name}</b> ${c.cost ? `· ${c.cost}` : ''} ${c.rating ? '⭐'.repeat(c.rating) : ''}
+                ${c.type ? `<div style="font-size:9px;color:var(--muted);margin-left:14px">${c.type} · ${c.access}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  });
+  
+  // Summary
+  html += `
+    <div style="background:rgba(34,211,238,0.05);border:1px solid var(--cyan);border-radius:8px;padding:12px;margin-top:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Total Distance</div>
+          <div style="font-size:18px;font-weight:800;color:var(--cyan);font-family:var(--mono)">${totalNm.toFixed(1)} nm</div>
+          <div style="font-size:9px;color:var(--muted)">${(totalNm*1.15078).toFixed(1)} miles</div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Est. Time</div>
+          <div style="font-size:18px;font-weight:800;color:var(--cyan);font-family:var(--mono)">${(totalNm/3).toFixed(1)} hrs</div>
+          <div style="font-size:9px;color:var(--muted)">@ 3 knots average</div>
+        </div>
+      </div>
+    </div>
+  `;
   
   document.getElementById('dash-float-plan').innerHTML = html;
 }
 
-function exportFloatPlan() {
+function exportFloatPlanPDF() {
   const trip = getActiveTrip();
-  if (!trip) { toast('Create a trip first'); return; }
+  if (!trip || !trip.waypoints || trip.waypoints.length < 2) {
+    toast('⚠ Need a complete route first');
+    return;
+  }
   
-  const dates = getTripDates(trip);
-  const wps = trip.waypoints || [];
-  let totalNm = 0;
-  for (let i = 1; i < wps.length; i++) totalNm += nmBetween(wps[i-1], wps[i]);
-  
-  let text = `FLOAT PLAN\n`;
-  text += `═══════════════════════════════════════\n\n`;
-  text += `Trip: ${trip.name}\n`;
-  text += `Area: ${trip.area || 'Not specified'}\n`;
-  text += `Dates: ${dates[0]} to ${dates[dates.length-1]} (${dates.length} days)\n`;
-  text += `Distance: ${totalNm.toFixed(1)} nm (${(totalNm * 1.15078).toFixed(1)} mi)\n\n`;
-  text += `ROUTE\n`;
-  text += `─────────────────────────────────────\n`;
-  
-  wps.forEach((wp, i) => {
-    const isStart = i === 0;
-    const isEnd = i === wps.length - 1;
-    const label = isStart ? 'START' : isEnd ? 'FINISH' : `WP${i}`;
-    let dist = '';
-    if (i > 0) {
-      const nm = nmBetween(wps[i-1], wp);
-      dist = ` (+${nm.toFixed(1)}nm)`;
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const wps = trip.waypoints;
+    const dates = getTripDates(trip);
+    const campsites = state.campsites;
+    
+    // Group waypoints by day
+    const dayGroups = {};
+    wps.forEach(wp => {
+      const day = wp.day || 1;
+      if (!dayGroups[day]) dayGroups[day] = [];
+      dayGroups[day].push(wp);
+    });
+    
+    // Calculate compass heading
+    const getHeading = (from, to) => {
+      const lat1 = from.lat * Math.PI / 180;
+      const lat2 = to.lat * Math.PI / 180;
+      const dLon = (to.lng - from.lng) * Math.PI / 180;
+      const y = Math.sin(dLon) * Math.cos(lat2);
+      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+      const bearing = Math.atan2(y, x) * 180 / Math.PI;
+      return (bearing + 360) % 360;
+    };
+    
+    const getCardinal = (deg) => {
+      const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+      return dirs[Math.round(deg / 22.5) % 16];
+    };
+    
+    let y = 20;
+    
+    // Header
+    doc.setFillColor(34, 211, 238);
+    doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(2, 12, 26);
+    doc.setFontSize(22);
+    doc.setFont(undefined, 'bold');
+    doc.text('EXPEDITION FLOAT PLAN', 15, 20);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'normal');
+    doc.text(trip.name, 15, 28);
+    doc.setFontSize(10);
+    doc.text(`${trip.area || 'Not specified'} | ${dates[0]} to ${dates[dates.length-1]}`, 15, 34);
+    
+    y = 50;
+    doc.setTextColor(0, 0, 0);
+    
+    // Trip Info
+    if (trip.participants) {
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('Participants:', 15, y);
+      doc.setFont(undefined, 'normal');
+      doc.text(trip.participants, 50, y);
+      y += 10;
     }
-    text += `${label}: ${wp.name || `${wp.lat.toFixed(4)}, ${wp.lng.toFixed(4)}`}${dist}\n`;
-  });
-  
-  text += `\n`;
-  text += `EMERGENCY CONTACTS\n`;
-  text += `─────────────────────────────────────\n`;
-  text += `[To be filled in by user]\n\n`;
-  text += `Generated by Paddle Planner\n`;
-  text += `https://gdickason.github.io/Paddle-Planner-V2/\n`;
-  
-  // Copy to clipboard
-  navigator.clipboard.writeText(text).then(() => {
-    toast('📋 Float plan copied to clipboard!');
-  }).catch(() => {
-    alert(text);
-  });
+    
+    // Day-by-day breakdown
+    const sortedDays = Object.keys(dayGroups).map(Number).sort((a,b)=>a-b);
+    let totalNm = 0;
+    
+    sortedDays.forEach(dayNum => {
+      const dayWps = dayGroups[dayNum];
+      const dateStr = dates[dayNum-1] ? new Date(dates[dayNum-1]+'T12:00:00').toLocaleDateString('en',{weekday:'long',month:'short',day:'numeric'}) : `Day ${dayNum}`;
+      
+      // Calculate day distance
+      let dayDist = 0;
+      for (let i=1; i<dayWps.length; i++) {
+        dayDist += nmBetween(dayWps[i-1], dayWps[i]);
+      }
+      totalNm += dayDist;
+      
+      // Check page break
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      // Day header
+      doc.setFillColor(10, 28, 46);
+      doc.rect(15, y-5, 180, 10, 'F');
+      doc.setTextColor(34, 211, 238);
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text(`Day ${dayNum} - ${dateStr}`, 18, y+2);
+      doc.text(`${dayDist.toFixed(1)} nm (${(dayDist*1.15078).toFixed(1)} mi)`, 160, y+2);
+      y += 12;
+      doc.setTextColor(0, 0, 0);
+      
+      // Waypoints
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'bold');
+      doc.text('NAVIGATION', 18, y);
+      y += 5;
+      doc.setFont(undefined, 'normal');
+      
+      dayWps.forEach((wp, i) => {
+        const isLast = i === dayWps.length - 1;
+        doc.text(`${i===0?'START':'WP'}: ${wp.name || wp.lat.toFixed(4)+', '+wp.lng.toFixed(4)}`, 20, y);
+        y += 4;
+        
+        if (!isLast) {
+          const nextWp = dayWps[i+1];
+          const dist = nmBetween(wp, nextWp);
+          const heading = getHeading(wp, nextWp);
+          const cardinal = getCardinal(heading);
+          doc.setFont(undefined, 'italic');
+          doc.text(`→ ${cardinal} (${Math.round(heading)}°) · ${dist.toFixed(1)} nm`, 25, y);
+          doc.setFont(undefined, 'normal');
+          y += 5;
+        }
+      });
+      
+      // Campsites
+      const dayCamps = campsites.filter(c => dayWps.some(wp => 
+        Math.abs(wp.lat - c.lat) < 0.01 && Math.abs(wp.lng - c.lng) < 0.01
+      ));
+      
+      if (dayCamps.length) {
+        y += 3;
+        doc.setFont(undefined, 'bold');
+        doc.text('CAMPSITES', 18, y);
+        y += 5;
+        doc.setFont(undefined, 'normal');
+        
+        dayCamps.forEach(c => {
+          doc.text(`• ${c.name} ${c.cost||''} ${c.rating?'★'.repeat(c.rating):''}`, 20, y);
+          y += 4;
+          if (c.type) {
+            doc.setFontSize(8);
+            doc.text(`  ${c.type} · ${c.access}`, 22, y);
+            doc.setFontSize(9);
+            y += 4;
+          }
+        });
+      }
+      
+      y += 8;
+    });
+    
+    // Summary
+    if (y > 240) {
+      doc.addPage();
+      y = 20;
+    }
+    
+    doc.setFillColor(34, 211, 238);
+    doc.rect(15, y-5, 180, 20, 'F');
+    doc.setTextColor(2, 12, 26);
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL: ${totalNm.toFixed(1)} nm (${(totalNm*1.15078).toFixed(1)} mi)`, 20, y+3);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Est. ${(totalNm/3).toFixed(1)} hrs @ 3 knots average`, 20, y+10);
+    
+    // Footer
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(8);
+    doc.text('Created by Paddle Planner | https://gdickason.github.io/Paddle-Planner-V2/', 15, 285);
+    
+    // Save
+    doc.save(`${trip.name.replace(/[^a-z0-9]/gi, '-')}-float-plan.pdf`);
+    toast('📄 PDF exported successfully!');
+    
+  } catch (error) {
+    console.error('PDF export error:', error);
+    toast('⚠ PDF export failed');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
