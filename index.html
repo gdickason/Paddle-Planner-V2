@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
 <style>
 :root {
   --bg:      #020c1a;
@@ -482,7 +483,10 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
               <div class="card">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
                   <div style="font-size:14px;font-weight:700;color:var(--cyan)">📋 Float Plan</div>
-                  <button class="btn-primary" style="padding:6px 14px;font-size:10px" onclick="exportFloatPlanPDF()">📄 Export PDF</button>
+                  <div style="display:flex;gap:8px">
+                    <button class="btn-ghost" style="padding:6px 14px;font-size:10px" onclick="shareTrip()">🔗 Share</button>
+                    <button class="btn-primary" style="padding:6px 14px;font-size:10px" onclick="exportFloatPlanPDF()">📄 PDF</button>
+                  </div>
                 </div>
                 <div id="dash-float-plan" style="max-height:340px;overflow-y:auto;font-size:11px;line-height:1.6">
                   <div style="color:var(--muted);font-style:italic">Plan your route to generate comprehensive float plan</div>
@@ -570,6 +574,18 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
           <button class="layer-btn active" data-layer="satellite">🛰 Satellite</button>
           <button class="layer-btn" data-layer="osm">🗺 Street</button>
           <button class="layer-btn" data-layer="topo">⛰ Topo</button>
+        </div>
+        <!-- Weather overlay controls for route map -->
+        <div style="position:absolute;top:12px;right:12px;z-index:400;display:flex;flex-direction:column;gap:8px" id="route-wx-controls">
+          <button id="route-wind-btn" onclick="toggleRouteWind()" style="background:rgba(7,21,37,0.95);border:1.5px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 14px;font-size:10px;font-weight:700;font-family:var(--sans);box-shadow:0 4px 20px rgba(0,0,0,0.5);transition:all 0.2s;display:flex;align-items:center;gap:6px">
+            <span>🌬</span> WIND OFF
+          </button>
+          <button id="route-currents-btn" onclick="toggleRouteCurrents()" style="background:rgba(7,21,37,0.95);border:1.5px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 14px;font-size:10px;font-weight:700;font-family:var(--sans);box-shadow:0 4px 20px rgba(0,0,0,0.5);transition:all 0.2s;display:flex;align-items:center;gap:6px">
+            <span>🌊</span> CURRENTS OFF
+          </button>
+          <button id="route-shelter-btn" onclick="toggleRouteShelter()" style="background:rgba(7,21,37,0.95);border:1.5px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 14px;font-size:10px;font-weight:700;font-family:var(--sans);box-shadow:0 4px 20px rgba(0,0,0,0.5);transition:all 0.2s;display:flex;align-items:center;gap:6px">
+            <span>🏝️</span> SHELTER OFF
+          </button>
         </div>
         <!-- Campsite modal -->
         <div class="modal-overlay" id="camp-modal" style="display:none">
@@ -987,6 +1003,15 @@ document.querySelectorAll('.nav-tab').forEach(btn => {
 let routeMap=null, weatherMap=null;
 let routeMapInit=false, weatherMapInit=false;
 
+// Route map weather overlay
+let routeWindOverlay = false;
+let routeCurrentsOverlay = false;
+let routeShelterOverlay = false;
+let routeWindMarkers = [];
+let routeCurrentMarkers = [];
+let routeShelterLayers = [];
+let routeWeatherData = null;
+
 // Tile layers
 // Tile layer factory — always returns fresh instances (each map needs its own)
 function makeTiles() {
@@ -1164,6 +1189,282 @@ function refreshRouteMap() {
     refreshDashMap();
     generateFloatPlan();
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ROUTE MAP WEATHER OVERLAY
+// ─────────────────────────────────────────────────────────────────
+
+async function toggleRouteWind() {
+  routeWindOverlay = !routeWindOverlay;
+  const btn = document.getElementById('route-wind-btn');
+  
+  if (routeWindOverlay) {
+    btn.style.borderColor = 'var(--cyan)';
+    btn.style.color = 'var(--cyan)';
+    btn.innerHTML = '<span>🌬</span> WIND ON';
+    await loadRouteWeather();
+    renderRouteWindOverlay();
+  } else {
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color = 'var(--muted)';
+    btn.innerHTML = '<span>🌬</span> WIND OFF';
+    clearRouteWindOverlay();
+  }
+}
+
+async function toggleRouteCurrents() {
+  routeCurrentsOverlay = !routeCurrentsOverlay;
+  const btn = document.getElementById('route-currents-btn');
+  
+  if (routeCurrentsOverlay) {
+    btn.style.borderColor = 'var(--cyan)';
+    btn.style.color = 'var(--cyan)';
+    btn.innerHTML = '<span>🌊</span> CURRENTS ON';
+    await loadRouteWeather();
+    renderRouteCurrentsOverlay();
+  } else {
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color = 'var(--muted)';
+    btn.innerHTML = '<span>🌊</span> CURRENTS OFF';
+    clearRouteCurrentsOverlay();
+  }
+}
+
+async function loadRouteWeather() {
+  if (routeWeatherData) return; // Already loaded
+  
+  const trip = getActiveTrip();
+  if (!trip || !trip.waypoints || trip.waypoints.length === 0) return;
+  
+  // Get bounding box of route
+  const lats = trip.waypoints.map(wp => wp.lat);
+  const lngs = trip.waypoints.map(wp => wp.lng);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  
+  // Expand box slightly
+  const latPad = (maxLat - minLat) * 0.1 || 0.1;
+  const lngPad = (maxLng - minLng) * 0.1 || 0.1;
+  
+  const centerLat = (minLat + maxLat) / 2;
+  const centerLng = (minLng + maxLng) / 2;
+  
+  try {
+    const wxUrl = `https://api.open-meteo.com/v1/forecast?latitude=${centerLat.toFixed(4)}&longitude=${centerLng.toFixed(4)}&hourly=temperature_2m,windspeed_10m,winddirection_10m,weathercode&windspeed_unit=mph&timezone=auto&forecast_days=7`;
+    const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${centerLat.toFixed(4)}&longitude=${centerLng.toFixed(4)}&hourly=wave_height,wave_direction,ocean_current_velocity,ocean_current_direction&timezone=auto&forecast_days=7`;
+    
+    const [wxRes, marineRes] = await Promise.all([
+      fetch(wxUrl),
+      fetch(marineUrl)
+    ]);
+    
+    const [wxData, marineData] = await Promise.all([
+      wxRes.json(),
+      marineRes.json()
+    ]);
+    
+    routeWeatherData = { wx: wxData, marine: marineData };
+    
+  } catch (error) {
+    console.error('Route weather fetch error:', error);
+    toast('⚠ Could not load weather overlay');
+  }
+}
+
+function renderRouteWindOverlay() {
+  if (!routeMap || !routeWeatherData) return;
+  
+  clearRouteWindOverlay();
+  
+  const bounds = routeMap.getBounds();
+  const trip = getActiveTrip();
+  if (!trip?.startDate) return;
+  
+  // Get current hour index (use noon of start date)
+  const startDate = new Date(trip.startDate + 'T12:00:00');
+  const now = new Date();
+  const hoursSinceStart = Math.floor((now - startDate) / (1000 * 60 * 60));
+  const hourIdx = Math.max(0, Math.min(hoursSinceStart, routeWeatherData.wx.hourly.time.length - 1));
+  
+  const windSpeed = routeWeatherData.wx.hourly.windspeed_10m[hourIdx];
+  const windDir = routeWeatherData.wx.hourly.winddirection_10m[hourIdx];
+  
+  // Create grid of wind arrows
+  const gridSize = 0.15; // degrees spacing
+  const minLat = bounds.getSouth();
+  const maxLat = bounds.getNorth();
+  const minLng = bounds.getWest();
+  const maxLng = bounds.getEast();
+  
+  for (let lat = minLat; lat <= maxLat; lat += gridSize) {
+    for (let lng = minLng; lng <= maxLng; lng += gridSize) {
+      const bft = mphToBft(windSpeed);
+      const color = bftColor(bft);
+      
+      const icon = L.divIcon({
+        html: buildWindArrowSVG(windDir, windSpeed, color, false),
+        className: '',
+        iconSize: [35, 35],
+        iconAnchor: [17.5, 17.5]
+      });
+      
+      const marker = L.marker([lat, lng], { icon }).addTo(routeMap);
+      routeWindMarkers.push(marker);
+    }
+  }
+}
+
+function renderRouteCurrentsOverlay() {
+  if (!routeMap || !routeWeatherData || !routeWeatherData.marine) return;
+  
+  clearRouteCurrentsOverlay();
+  
+  const bounds = routeMap.getBounds();
+  const trip = getActiveTrip();
+  if (!trip?.startDate) return;
+  
+  const startDate = new Date(trip.startDate + 'T12:00:00');
+  const now = new Date();
+  const hoursSinceStart = Math.floor((now - startDate) / (1000 * 60 * 60));
+  const hourIdx = Math.max(0, Math.min(hoursSinceStart, routeWeatherData.marine.hourly.time.length - 1));
+  
+  const currentVel = routeWeatherData.marine.hourly.ocean_current_velocity?.[hourIdx] || 0;
+  const currentDir = routeWeatherData.marine.hourly.ocean_current_direction?.[hourIdx] || 0;
+  
+  // Create grid of current arrows
+  const gridSize = 0.2; // degrees spacing (less dense than wind)
+  const minLat = bounds.getSouth();
+  const maxLat = bounds.getNorth();
+  const minLng = bounds.getWest();
+  const maxLng = bounds.getEast();
+  
+  for (let lat = minLat; lat <= maxLat; lat += gridSize) {
+    for (let lng = minLng; lng <= maxLng; lng += gridSize) {
+      const icon = L.divIcon({
+        html: buildCurrentArrowSVG(currentDir, currentVel, '#06b6d4'),
+        className: '',
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
+      });
+      
+      const marker = L.marker([lat, lng], { icon }).addTo(routeMap);
+      routeCurrentMarkers.push(marker);
+    }
+  }
+}
+
+function clearRouteWindOverlay() {
+  routeWindMarkers.forEach(m => routeMap.removeLayer(m));
+  routeWindMarkers = [];
+}
+
+function clearRouteCurrentsOverlay() {
+  routeCurrentMarkers.forEach(m => routeMap.removeLayer(m));
+  routeCurrentMarkers = [];
+}
+
+async function toggleRouteShelter() {
+  routeShelterOverlay = !routeShelterOverlay;
+  const btn = document.getElementById('route-shelter-btn');
+  
+  if (routeShelterOverlay) {
+    btn.style.borderColor = 'var(--cyan)';
+    btn.style.color = 'var(--cyan)';
+    btn.innerHTML = '<span>🏝️</span> SHELTER ON';
+    await loadRouteWeather();
+    renderRouteShelterOverlay();
+  } else {
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color = 'var(--muted)';
+    btn.innerHTML = '<span>🏝️</span> SHELTER OFF';
+    clearRouteShelterOverlay();
+  }
+}
+
+function renderRouteShelterOverlay() {
+  if (!routeMap || !routeWeatherData) return;
+  
+  clearRouteShelterOverlay();
+  
+  const trip = getActiveTrip();
+  if (!trip?.startDate) return;
+  
+  // Get wind direction from weather data
+  const startDate = new Date(trip.startDate + 'T12:00:00');
+  const now = new Date();
+  const hoursSinceStart = Math.floor((now - startDate) / (1000 * 60 * 60));
+  const hourIdx = Math.max(0, Math.min(hoursSinceStart, routeWeatherData.wx.hourly.time.length - 1));
+  
+  const windDir = routeWeatherData.wx.hourly.winddirection_10m[hourIdx];
+  const windSpeed = routeWeatherData.wx.hourly.windspeed_10m[hourIdx];
+  
+  // Get campsites as proxy for islands/land masses
+  const islands = state.campsites.filter(c => c.lat && c.lng && (c.type === 'Island' || c.type === 'Mainland'));
+  
+  if (islands.length === 0) {
+    toast('💡 Add island campsites to see shelter zones');
+    return;
+  }
+  
+  // Calculate lee zones behind islands
+  islands.forEach(island => {
+    // Lee zone extends downwind from island
+    // Simplified: create a cone-shaped polygon
+    
+    const leeDistance = Math.min(windSpeed * 0.02, 0.3); // Max 0.3 degrees (~20 miles)
+    const leeAngle = 30; // Cone angle in degrees
+    
+    // Convert wind direction to bearing (from where wind comes)
+    const leeBearing = (windDir + 180) % 360;
+    
+    // Create cone points
+    const points = [];
+    const numPoints = 12;
+    
+    for (let i = 0; i <= numPoints; i++) {
+      const angle = leeBearing + (i / numPoints - 0.5) * leeAngle;
+      const angleRad = angle * Math.PI / 180;
+      const distance = leeDistance * (1 - Math.abs(i / numPoints - 0.5) * 0.5); // Tapered
+      
+      const lat = island.lat + distance * Math.cos(angleRad);
+      const lng = island.lng + distance * Math.sin(angleRad) / Math.cos(island.lat * Math.PI / 180);
+      
+      points.push([lat, lng]);
+    }
+    
+    // Close the polygon by adding island point
+    points.push([island.lat, island.lng]);
+    
+    // Create polygon layer
+    const polygon = L.polygon(points, {
+      color: '#4ade80',
+      fillColor: '#4ade80',
+      fillOpacity: 0.15,
+      weight: 1,
+      opacity: 0.3,
+      dashArray: '5, 5'
+    }).addTo(routeMap);
+    
+    polygon.bindPopup(`
+      <div style="font-size:11px">
+        <b>🏝️ Sheltered Zone</b><br>
+        Lee of ${island.name}<br>
+        <span style="color:var(--green)">Protected from ${Math.round(windDir)}° wind</span>
+      </div>
+    `);
+    
+    routeShelterLayers.push(polygon);
+  });
+  
+  toast(`🏝️ Showing shelter behind ${islands.length} island${islands.length>1?'s':''}`);
+}
+
+function clearRouteShelterOverlay() {
+  routeShelterLayers.forEach(l => routeMap.removeLayer(l));
+  routeShelterLayers = [];
 }
 
 let pendingCampLL = null;
@@ -3220,10 +3521,266 @@ function exportFloatPlanPDF() {
   }
 }
 
+// ╔═══════════════════════════════════════════════════════════════╗
+// ║  SHAREABLE TRIP URLS                                          ║
+// ╚═══════════════════════════════════════════════════════════════╝
+
+function shareTrip() {
+  const trip = getActiveTrip();
+  if (!trip || !trip.waypoints || trip.waypoints.length < 2) {
+    toast('⚠ Need a complete trip to share');
+    return;
+  }
+  
+  try {
+    // Create shareable trip object (subset of data)
+    const shareData = {
+      name: trip.name,
+      area: trip.area,
+      startDate: trip.startDate,
+      endDate: trip.endDate,
+      participants: trip.participants,
+      notes: trip.notes,
+      waypoints: trip.waypoints.map(wp => ({
+        lat: wp.lat,
+        lng: wp.lng,
+        name: wp.name,
+        day: wp.day
+      })),
+      // Add relevant campsites
+      campsites: state.campsites.filter(c => 
+        trip.waypoints.some(wp => 
+          Math.abs(wp.lat - c.lat) < 0.01 && Math.abs(wp.lng - c.lng) < 0.01
+        )
+      )
+    };
+    
+    // Compress and encode
+    const json = JSON.stringify(shareData);
+    const compressed = LZString.compressToEncodedURIComponent(json);
+    
+    // Create shareable URL
+    const baseUrl = window.location.origin + window.location.pathname;
+    const shareUrl = `${baseUrl}#trip=${compressed}`;
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      toast('🔗 Share link copied! Anyone can view your trip.');
+    }).catch(() => {
+      // Fallback: show in prompt
+      prompt('Share this URL:', shareUrl);
+    });
+    
+  } catch (error) {
+    console.error('Share error:', error);
+    toast('⚠ Could not create share link');
+  }
+}
+
+function loadSharedTrip() {
+  const hash = window.location.hash;
+  if (!hash || !hash.startsWith('#trip=')) return false;
+  
+  try {
+    const compressed = hash.substring(6); // Remove '#trip='
+    const json = LZString.decompressFromEncodedURIComponent(compressed);
+    if (!json) return false;
+    
+    const tripData = JSON.parse(json);
+    
+    // Show shared trip view
+    showSharedTripView(tripData);
+    return true;
+    
+  } catch (error) {
+    console.error('Failed to load shared trip:', error);
+    toast('⚠ Invalid share link');
+    return false;
+  }
+}
+
+function showSharedTripView(tripData) {
+  // Hide normal UI, show read-only trip view
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.querySelector('nav').style.display = 'none';
+  
+  // Create and show shared view
+  const sharedView = document.createElement('div');
+  sharedView.id = 'shared-trip-view';
+  sharedView.style.cssText = 'width:100%;height:100vh;overflow-y:auto;background:var(--bg);padding:40px 20px';
+  
+  const dates = [];
+  if (tripData.startDate) {
+    const start = tripData.startDate;
+    const end = tripData.endDate || start;
+    const [startY, startM, startD] = start.split('-').map(Number);
+    const [endY, endM, endD] = end.split('-').map(Number);
+    const startDate = new Date(startY, startM - 1, startD, 12, 0, 0);
+    const endDate = new Date(endY, endM - 1, endD, 12, 0, 0);
+    const current = new Date(startDate);
+    while (current <= endDate) {
+      const y = current.getFullYear();
+      const m = String(current.getMonth() + 1).padStart(2, '0');
+      const d = String(current.getDate()).padStart(2, '0');
+      dates.push(`${y}-${m}-${d}`);
+      current.setDate(current.getDate() + 1);
+    }
+  }
+  
+  // Group waypoints by day
+  const dayGroups = {};
+  tripData.waypoints.forEach(wp => {
+    const day = wp.day || 1;
+    if (!dayGroups[day]) dayGroups[day] = [];
+    dayGroups[day].push(wp);
+  });
+  
+  const getHeading = (from, to) => {
+    const lat1 = from.lat * Math.PI / 180;
+    const lat2 = to.lat * Math.PI / 180;
+    const dLon = (to.lng - from.lng) * Math.PI / 180;
+    const y = Math.sin(dLon) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    const bearing = Math.atan2(y, x) * 180 / Math.PI;
+    return (bearing + 360) % 360;
+  };
+  
+  const getCardinal = (deg) => {
+    const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+    return dirs[Math.round(deg / 22.5) % 16];
+  };
+  
+  const nmBetween = (a, b) => {
+    const R = 3440.065; // Earth radius in nautical miles
+    const dLat = (b.lat - a.lat) * Math.PI / 180;
+    const dLon = (b.lng - a.lng) * Math.PI / 180;
+    const lat1 = a.lat * Math.PI / 180;
+    const lat2 = b.lat * Math.PI / 180;
+    const x = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
+    const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+    return R * c;
+  };
+  
+  const sortedDays = Object.keys(dayGroups).map(Number).sort((a,b)=>a-b);
+  let totalNm = 0;
+  
+  let dayHtml = '';
+  sortedDays.forEach(dayNum => {
+    const dayWps = dayGroups[dayNum];
+    const dateStr = dates[dayNum-1] ? new Date(dates[dayNum-1]+'T12:00:00').toLocaleDateString('en',{weekday:'long',month:'short',day:'numeric'}) : `Day ${dayNum}`;
+    
+    let dayDist = 0;
+    for (let i=1; i<dayWps.length; i++) {
+      dayDist += nmBetween(dayWps[i-1], dayWps[i]);
+    }
+    totalNm += dayDist;
+    
+    const dayCamps = (tripData.campsites || []).filter(c => dayWps.some(wp => 
+      Math.abs(wp.lat - c.lat) < 0.01 && Math.abs(wp.lng - c.lng) < 0.01
+    ));
+    
+    dayHtml += `
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div>
+            <div style="font-size:18px;font-weight:700;color:var(--cyan)">Day ${dayNum}</div>
+            <div style="font-size:11px;color:var(--muted)">${dateStr}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:20px;font-weight:800;color:var(--amber);font-family:var(--mono)">${dayDist.toFixed(1)} nm</div>
+            <div style="font-size:10px;color:var(--muted)">${(dayDist*1.15078).toFixed(1)} mi</div>
+          </div>
+        </div>
+        
+        <div style="margin-bottom:12px">
+          <div style="font-size:10px;color:var(--dim);text-transform:uppercase;margin-bottom:8px;letter-spacing:0.1em">Route</div>
+          ${dayWps.map((wp, i) => {
+            const isLast = i === dayWps.length - 1;
+            let navInfo = '';
+            if (!isLast) {
+              const nextWp = dayWps[i+1];
+              const dist = nmBetween(wp, nextWp);
+              const heading = getHeading(wp, nextWp);
+              const cardinal = getCardinal(heading);
+              navInfo = `<div style="font-size:10px;color:var(--amber);margin-top:3px;margin-left:20px">→ ${cardinal} (${Math.round(heading)}°) · ${dist.toFixed(1)} nm</div>`;
+            }
+            return `<div style="margin-bottom:8px">
+              <div style="font-size:12px;color:var(--text)">${i===0?'🟢':'⚓'} <b>${wp.name || wp.lat.toFixed(4)+', '+wp.lng.toFixed(4)}</b></div>
+              ${navInfo}
+            </div>`;
+          }).join('')}
+        </div>
+        
+        ${dayCamps.length ? `
+          <div style="border-top:1px solid var(--border);padding-top:12px">
+            <div style="font-size:10px;color:var(--dim);text-transform:uppercase;margin-bottom:8px;letter-spacing:0.1em">Campsites</div>
+            ${dayCamps.map(c => `
+              <div style="font-size:11px;color:var(--text);margin-bottom:6px">
+                ⛺ <b>${c.name}</b> ${c.cost ? `· ${c.cost}` : ''} ${c.rating ? '⭐'.repeat(c.rating) : ''}
+                ${c.type ? `<div style="font-size:10px;color:var(--muted);margin-left:18px">${c.type} · ${c.access}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  });
+  
+  sharedView.innerHTML = `
+    <div style="max-width:900px;margin:0 auto">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#22d3ee,#0891b2);border-radius:16px;padding:32px;margin-bottom:32px;box-shadow:0 8px 24px rgba(34,211,238,0.2)">
+        <div style="font-size:28px;font-weight:800;color:#020c1a;margin-bottom:8px">${tripData.name}</div>
+        <div style="font-size:14px;color:rgba(2,12,26,0.8);margin-bottom:12px">${tripData.area || 'Adventure'}</div>
+        <div style="font-size:12px;color:rgba(2,12,26,0.7)">${dates[0]} to ${dates[dates.length-1]} (${dates.length} day${dates.length>1?'s':''})</div>
+        ${tripData.participants ? `<div style="font-size:12px;color:rgba(2,12,26,0.7);margin-top:6px">👥 ${tripData.participants}</div>` : ''}
+      </div>
+      
+      <!-- Day by day -->
+      <div style="margin-bottom:32px">
+        <div style="font-size:20px;font-weight:700;color:var(--cyan);margin-bottom:20px">📅 Day-by-Day Itinerary</div>
+        ${dayHtml}
+      </div>
+      
+      <!-- Summary -->
+      <div style="background:rgba(34,211,238,0.05);border:2px solid var(--cyan);border-radius:12px;padding:24px;margin-bottom:32px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Total Distance</div>
+            <div style="font-size:32px;font-weight:800;color:var(--cyan);font-family:var(--mono)">${totalNm.toFixed(1)} nm</div>
+            <div style="font-size:12px;color:var(--muted)">${(totalNm*1.15078).toFixed(1)} miles</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Est. Paddle Time</div>
+            <div style="font-size:32px;font-weight:800;color:var(--cyan);font-family:var(--mono)">${(totalNm/3).toFixed(1)} hrs</div>
+            <div style="font-size:12px;color:var(--muted)">@ 3 knots average</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Footer -->
+      <div style="text-align:center;padding:24px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Trip shared from</div>
+        <div style="font-size:18px;font-weight:700;color:var(--cyan);margin-bottom:8px">🛶 Paddle Planner</div>
+        <div style="font-size:11px;color:var(--dim)">Professional Sea Kayak Expedition Planning</div>
+        <a href="${window.location.origin}${window.location.pathname}" style="display:inline-block;margin-top:16px;background:var(--cyan);color:#020c1a;padding:10px 24px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:700">Plan Your Own Adventure →</a>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(sharedView);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', function() {
+  // Check for shared trip first
+  if (loadSharedTrip()) {
+    return; // Don't load normal app if viewing shared trip
+  }
+  
   load();
   renderDashboard();
   showPage('dashboard');
