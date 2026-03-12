@@ -583,9 +583,6 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
           <button id="route-currents-btn" onclick="toggleRouteCurrents()" style="background:rgba(7,21,37,0.95);border:1.5px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 14px;font-size:10px;font-weight:700;font-family:var(--sans);box-shadow:0 4px 20px rgba(0,0,0,0.5);transition:all 0.2s;display:flex;align-items:center;gap:6px">
             <span>🌊</span> CURRENTS OFF
           </button>
-          <button id="route-shelter-btn" onclick="toggleRouteShelter()" style="background:rgba(7,21,37,0.95);border:1.5px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 14px;font-size:10px;font-weight:700;font-family:var(--sans);box-shadow:0 4px 20px rgba(0,0,0,0.5);transition:all 0.2s;display:flex;align-items:center;gap:6px">
-            <span>🏝️</span> SHELTER OFF
-          </button>
         </div>
         <!-- Campsite modal -->
         <div class="modal-overlay" id="camp-modal" style="display:none">
@@ -1006,10 +1003,8 @@ let routeMapInit=false, weatherMapInit=false;
 // Route map weather overlay
 let routeWindOverlay = false;
 let routeCurrentsOverlay = false;
-let routeShelterOverlay = false;
 let routeWindMarkers = [];
 let routeCurrentMarkers = [];
-let routeShelterLayers = [];
 let routeWeatherData = null;
 
 // Tile layers
@@ -1292,8 +1287,8 @@ function renderRouteWindOverlay() {
   const windSpeed = routeWeatherData.wx.hourly.windspeed_10m[hourIdx];
   const windDir = routeWeatherData.wx.hourly.winddirection_10m[hourIdx];
   
-  // Create grid of wind arrows
-  const gridSize = 0.15; // degrees spacing
+  // Create denser grid of wind arrows for better visibility
+  const gridSize = 0.08; // Denser grid - was 0.15
   const minLat = bounds.getSouth();
   const maxLat = bounds.getNorth();
   const minLng = bounds.getWest();
@@ -1307,8 +1302,8 @@ function renderRouteWindOverlay() {
       const icon = L.divIcon({
         html: buildWindArrowSVG(windDir, windSpeed, color, false),
         className: '',
-        iconSize: [35, 35],
-        iconAnchor: [17.5, 17.5]
+        iconSize: [50, 50], // Bigger icons - was 35
+        iconAnchor: [25, 25]
       });
       
       const marker = L.marker([lat, lng], { icon }).addTo(routeMap);
@@ -1334,8 +1329,8 @@ function renderRouteCurrentsOverlay() {
   const currentVel = routeWeatherData.marine.hourly.ocean_current_velocity?.[hourIdx] || 0;
   const currentDir = routeWeatherData.marine.hourly.ocean_current_direction?.[hourIdx] || 0;
   
-  // Create grid of current arrows
-  const gridSize = 0.2; // degrees spacing (less dense than wind)
+  // Create denser grid of current arrows
+  const gridSize = 0.12; // Denser - was 0.2
   const minLat = bounds.getSouth();
   const maxLat = bounds.getNorth();
   const minLng = bounds.getWest();
@@ -1346,8 +1341,8 @@ function renderRouteCurrentsOverlay() {
       const icon = L.divIcon({
         html: buildCurrentArrowSVG(currentDir, currentVel, '#06b6d4'),
         className: '',
-        iconSize: [40, 40],
-        iconAnchor: [20, 20]
+        iconSize: [50, 50], // Bigger - was 40
+        iconAnchor: [25, 25]
       });
       
       const marker = L.marker([lat, lng], { icon }).addTo(routeMap);
@@ -1364,107 +1359,6 @@ function clearRouteWindOverlay() {
 function clearRouteCurrentsOverlay() {
   routeCurrentMarkers.forEach(m => routeMap.removeLayer(m));
   routeCurrentMarkers = [];
-}
-
-async function toggleRouteShelter() {
-  routeShelterOverlay = !routeShelterOverlay;
-  const btn = document.getElementById('route-shelter-btn');
-  
-  if (routeShelterOverlay) {
-    btn.style.borderColor = 'var(--cyan)';
-    btn.style.color = 'var(--cyan)';
-    btn.innerHTML = '<span>🏝️</span> SHELTER ON';
-    await loadRouteWeather();
-    renderRouteShelterOverlay();
-  } else {
-    btn.style.borderColor = 'var(--border)';
-    btn.style.color = 'var(--muted)';
-    btn.innerHTML = '<span>🏝️</span> SHELTER OFF';
-    clearRouteShelterOverlay();
-  }
-}
-
-function renderRouteShelterOverlay() {
-  if (!routeMap || !routeWeatherData) return;
-  
-  clearRouteShelterOverlay();
-  
-  const trip = getActiveTrip();
-  if (!trip?.startDate) return;
-  
-  // Get wind direction from weather data
-  const startDate = new Date(trip.startDate + 'T12:00:00');
-  const now = new Date();
-  const hoursSinceStart = Math.floor((now - startDate) / (1000 * 60 * 60));
-  const hourIdx = Math.max(0, Math.min(hoursSinceStart, routeWeatherData.wx.hourly.time.length - 1));
-  
-  const windDir = routeWeatherData.wx.hourly.winddirection_10m[hourIdx];
-  const windSpeed = routeWeatherData.wx.hourly.windspeed_10m[hourIdx];
-  
-  // Get campsites as proxy for islands/land masses
-  const islands = state.campsites.filter(c => c.lat && c.lng && (c.type === 'Island' || c.type === 'Mainland'));
-  
-  if (islands.length === 0) {
-    toast('💡 Add island campsites to see shelter zones');
-    return;
-  }
-  
-  // Calculate lee zones behind islands
-  islands.forEach(island => {
-    // Lee zone extends downwind from island
-    // Simplified: create a cone-shaped polygon
-    
-    const leeDistance = Math.min(windSpeed * 0.02, 0.3); // Max 0.3 degrees (~20 miles)
-    const leeAngle = 30; // Cone angle in degrees
-    
-    // Convert wind direction to bearing (from where wind comes)
-    const leeBearing = (windDir + 180) % 360;
-    
-    // Create cone points
-    const points = [];
-    const numPoints = 12;
-    
-    for (let i = 0; i <= numPoints; i++) {
-      const angle = leeBearing + (i / numPoints - 0.5) * leeAngle;
-      const angleRad = angle * Math.PI / 180;
-      const distance = leeDistance * (1 - Math.abs(i / numPoints - 0.5) * 0.5); // Tapered
-      
-      const lat = island.lat + distance * Math.cos(angleRad);
-      const lng = island.lng + distance * Math.sin(angleRad) / Math.cos(island.lat * Math.PI / 180);
-      
-      points.push([lat, lng]);
-    }
-    
-    // Close the polygon by adding island point
-    points.push([island.lat, island.lng]);
-    
-    // Create polygon layer
-    const polygon = L.polygon(points, {
-      color: '#4ade80',
-      fillColor: '#4ade80',
-      fillOpacity: 0.15,
-      weight: 1,
-      opacity: 0.3,
-      dashArray: '5, 5'
-    }).addTo(routeMap);
-    
-    polygon.bindPopup(`
-      <div style="font-size:11px">
-        <b>🏝️ Sheltered Zone</b><br>
-        Lee of ${island.name}<br>
-        <span style="color:var(--green)">Protected from ${Math.round(windDir)}° wind</span>
-      </div>
-    `);
-    
-    routeShelterLayers.push(polygon);
-  });
-  
-  toast(`🏝️ Showing shelter behind ${islands.length} island${islands.length>1?'s':''}`);
-}
-
-function clearRouteShelterOverlay() {
-  routeShelterLayers.forEach(l => routeMap.removeLayer(l));
-  routeShelterLayers = [];
 }
 
 let pendingCampLL = null;
@@ -2282,35 +2176,37 @@ function renderWxWindArrows() {
 }
 
 function buildWindArrowSVG(dir, speed, col, large=false) {
-  // V2: Refined - smaller, less distracting
-  const size = large ? 50 : 35;  // Reduced from 48
+  // V4 REFINED: Bigger, clearer arrows for route overlay
+  const size = large ? 60 : 50;  // Increased for visibility
   const half = size / 2;
-  const len = large ? 16 : 11;  // Shorter arrows
+  const len = large ? 20 : 16;  // Longer arrows
   const r = dir*Math.PI/180;
   const sx=Math.sin(r)*len, sy=-Math.cos(r)*len;
   const tx=half-sx, ty=half-sy, bx=half+sx, by=half+sy;
-  const headSize = large ? 0.4 : 0.35;
+  const headSize = large ? 0.5 : 0.45; // Bigger arrowhead
   const px1=tx+sy*headSize, py1=ty-sx*headSize;
   const px2=tx-sy*headSize, py2=ty+sx*headSize;
-  const fontSize = large ? 10 : 8;
-  return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" style="opacity:0.75">
-    <line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="${large?2.5:1.8}" stroke-linecap="round"/>
+  const fontSize = large ? 12 : 10;
+  const strokeWidth = large ? 3 : 2.5;
+  return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" style="opacity:0.95">
+    <line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
     <polygon points="${tx},${ty} ${px1},${py1} ${px2},${py2}" fill="${col}"/>
-    <text x="${half}" y="${size-3}" text-anchor="middle" fill="${col}" font-size="${fontSize}" font-weight="bold" font-family="monospace" stroke="#020c1a" stroke-width="2.5" paint-order="stroke">${Math.round(speed)}</text>
+    <text x="${half}" y="${size-4}" text-anchor="middle" fill="${col}" font-size="${fontSize}" font-weight="bold" font-family="monospace" stroke="#020c1a" stroke-width="3" paint-order="stroke">${Math.round(speed)}</text>
   </svg>`;
 }
 
 function buildCurrentArrowSVG(dir, speed, col) {
-  const size = 40, half = 20, len = 12;
+  // V4 REFINED: Bigger, clearer current arrows
+  const size = 50, half = 25, len = 16;
   const r = dir*Math.PI/180;
   const sx=Math.sin(r)*len, sy=-Math.cos(r)*len;
   const tx=half-sx, ty=half-sy, bx=half+sx, by=half+sy;
-  const px1=tx+sy*0.3, py1=ty-sx*0.3;
-  const px2=tx-sy*0.3, py2=ty+sx*0.3;
+  const px1=tx+sy*0.4, py1=ty-sx*0.4;
+  const px2=tx-sy*0.4, py2=ty+sx*0.4;
   return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-    <line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-dasharray="4,2" opacity="0.7"/>
-    <polygon points="${tx},${ty} ${px1},${py1} ${px2},${py2}" fill="${col}" opacity="0.7"/>
-    <text x="${half}" y="${size-1}" text-anchor="middle" fill="${col}" font-size="7" font-weight="bold" font-family="monospace" stroke="black" stroke-width="2" paint-order="stroke">${speed.toFixed(1)}kt</text>
+    <line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="5,3" opacity="0.85"/>
+    <polygon points="${tx},${ty} ${px1},${py1} ${px2},${py2}" fill="${col}" opacity="0.85"/>
+    <text x="${half}" y="${size-3}" text-anchor="middle" fill="${col}" font-size="9" font-weight="bold" font-family="monospace" stroke="#020c1a" stroke-width="2.5" paint-order="stroke">${speed.toFixed(1)}kt</text>
   </svg>`;
 }
 
