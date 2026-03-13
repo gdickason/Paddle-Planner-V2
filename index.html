@@ -1274,42 +1274,49 @@ function renderRouteWindOverlay() {
   
   clearRouteWindOverlay();
   
-  const bounds = routeMap.getBounds();
   const trip = getActiveTrip();
-  if (!trip?.startDate) return;
+  const wps = trip?.waypoints || [];
+  if (!trip?.startDate || !wps.length) return;
   
-  // Get current hour index (use noon of start date)
+  // Get current hour index
   const startDate = new Date(trip.startDate + 'T12:00:00');
   const now = new Date();
   const hoursSinceStart = Math.floor((now - startDate) / (1000 * 60 * 60));
   const hourIdx = Math.max(0, Math.min(hoursSinceStart, routeWeatherData.wx.hourly.time.length - 1));
   
-  const windSpeed = routeWeatherData.wx.hourly.windspeed_10m[hourIdx];
-  const windDir = routeWeatherData.wx.hourly.winddirection_10m[hourIdx];
+  const wind = routeWeatherData.wx.hourly.windspeed_10m[hourIdx] || 0;
+  const dir = routeWeatherData.wx.hourly.winddirection_10m[hourIdx] || 0;
+  const bft = mphToBft(wind);
+  const col = bftColor(bft);
   
-  // Create denser grid of wind arrows for better visibility
-  const gridSize = 0.08; // Denser grid - was 0.15
-  const minLat = bounds.getSouth();
-  const maxLat = bounds.getNorth();
-  const minLng = bounds.getWest();
-  const maxLng = bounds.getEast();
+  // ORIGINAL WEATHER PAGE STYLE: 5x6 grid + waypoints
+  const bounds = routeMap.getBounds();
+  const minLat = bounds.getSouth(), maxLat = bounds.getNorth();
+  const minLng = bounds.getWest(), maxLng = bounds.getEast();
+  const gridStepLat = (maxLat - minLat) / 5;
+  const gridStepLng = (maxLng - minLng) / 6;
   
-  for (let lat = minLat; lat <= maxLat; lat += gridSize) {
-    for (let lng = minLng; lng <= maxLng; lng += gridSize) {
-      const bft = mphToBft(windSpeed);
-      const color = bftColor(bft);
-      
-      const icon = L.divIcon({
-        html: buildWindArrowSVG(windDir, windSpeed, color, false),
-        className: '',
-        iconSize: [50, 50], // Bigger icons - was 35
-        iconAnchor: [25, 25]
-      });
-      
-      const marker = L.marker([lat, lng], { icon }).addTo(routeMap);
-      routeWindMarkers.push(marker);
+  // Grid points
+  const gridPts = [];
+  for (let lat = minLat + gridStepLat * 0.5; lat < maxLat; lat += gridStepLat) {
+    for (let lng = minLng + gridStepLng * 0.5; lng < maxLng; lng += gridStepLng) {
+      gridPts.push({ lat, lng });
     }
   }
+  
+  // Add waypoints as extra wind arrow locations
+  wps.forEach(wp => gridPts.push({ lat: wp.lat, lng: wp.lng, isWP: true }));
+  
+  gridPts.forEach(pt => {
+    const icon = L.divIcon({
+      className: '',
+      html: buildWindArrowSVG(dir, wind, col, pt.isWP),
+      iconSize: [48, 48],
+      iconAnchor: [24, 24]
+    });
+    const marker = L.marker([pt.lat, pt.lng], { icon, interactive: false }).addTo(routeMap);
+    routeWindMarkers.push(marker);
+  });
 }
 
 function renderRouteCurrentsOverlay() {
@@ -1317,9 +1324,9 @@ function renderRouteCurrentsOverlay() {
   
   clearRouteCurrentsOverlay();
   
-  const bounds = routeMap.getBounds();
   const trip = getActiveTrip();
-  if (!trip?.startDate) return;
+  const wps = trip?.waypoints || [];
+  if (!trip?.startDate || !wps.length) return;
   
   const startDate = new Date(trip.startDate + 'T12:00:00');
   const now = new Date();
@@ -1329,23 +1336,31 @@ function renderRouteCurrentsOverlay() {
   const currentVel = routeWeatherData.marine.hourly.ocean_current_velocity?.[hourIdx] || 0;
   const currentDir = routeWeatherData.marine.hourly.ocean_current_direction?.[hourIdx] || 0;
   
-  // Create denser grid of current arrows
-  const gridSize = 0.12; // Denser - was 0.2
-  const minLat = bounds.getSouth();
-  const maxLat = bounds.getNorth();
-  const minLng = bounds.getWest();
-  const maxLng = bounds.getEast();
+  // ORIGINAL WEATHER PAGE STYLE: 7x8 grid with simulated tidal variation
+  const bounds = routeMap.getBounds();
+  const minLat = bounds.getSouth(), maxLat = bounds.getNorth();
+  const minLng = bounds.getWest(), maxLng = bounds.getEast();
+  const gridStepLat = (maxLat - minLat) / 7;
+  const gridStepLng = (maxLng - minLng) / 8;
   
-  for (let lat = minLat; lat <= maxLat; lat += gridSize) {
-    for (let lng = minLng; lng <= maxLng; lng += gridSize) {
+  const currentHour = new Date().getHours();
+  const tidalPhase = (currentHour % 12) / 12;
+  const isFlood = currentHour % 12 < 6;
+  const baseDir = isFlood ? 45 : 225; // NE flood, SW ebb
+  const speed = 0.5 + Math.abs(Math.sin(tidalPhase * Math.PI)) * 1.5;
+  const currentCol = '#a78bfa';
+  
+  for (let lat = minLat + gridStepLat * 0.5; lat < maxLat; lat += gridStepLat) {
+    for (let lng = minLng + gridStepLng * 0.5; lng < maxLng; lng += gridStepLng) {
+      const jitter = (Math.sin(lat * 47 + lng * 31) * 20);
+      const localDir = (baseDir + jitter + 360) % 360;
       const icon = L.divIcon({
-        html: buildCurrentArrowSVG(currentDir, currentVel, '#06b6d4'),
         className: '',
-        iconSize: [50, 50], // Bigger - was 40
-        iconAnchor: [25, 25]
+        html: buildCurrentArrowSVG(localDir, speed, currentCol),
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
       });
-      
-      const marker = L.marker([lat, lng], { icon }).addTo(routeMap);
+      const marker = L.marker([lat, lng], { icon, interactive: false }).addTo(routeMap);
       routeCurrentMarkers.push(marker);
     }
   }
@@ -2176,37 +2191,36 @@ function renderWxWindArrows() {
 }
 
 function buildWindArrowSVG(dir, speed, col, large=false) {
-  // V4 REFINED: Bigger, clearer arrows for route overlay
-  const size = large ? 60 : 50;  // Increased for visibility
+  // ORIGINAL STYLE: Simple sticks at regular intervals
+  const size = large ? 50 : 35;
   const half = size / 2;
-  const len = large ? 20 : 16;  // Longer arrows
+  const len = large ? 16 : 11;
   const r = dir*Math.PI/180;
   const sx=Math.sin(r)*len, sy=-Math.cos(r)*len;
   const tx=half-sx, ty=half-sy, bx=half+sx, by=half+sy;
-  const headSize = large ? 0.5 : 0.45; // Bigger arrowhead
+  const headSize = large ? 0.4 : 0.35;
   const px1=tx+sy*headSize, py1=ty-sx*headSize;
   const px2=tx-sy*headSize, py2=ty+sx*headSize;
-  const fontSize = large ? 12 : 10;
-  const strokeWidth = large ? 3 : 2.5;
-  return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" style="opacity:0.95">
-    <line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="${strokeWidth}" stroke-linecap="round"/>
+  const fontSize = large ? 10 : 8;
+  return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" style="opacity:0.75">
+    <line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="${large?2.5:1.8}" stroke-linecap="round"/>
     <polygon points="${tx},${ty} ${px1},${py1} ${px2},${py2}" fill="${col}"/>
-    <text x="${half}" y="${size-4}" text-anchor="middle" fill="${col}" font-size="${fontSize}" font-weight="bold" font-family="monospace" stroke="#020c1a" stroke-width="3" paint-order="stroke">${Math.round(speed)}</text>
+    <text x="${half}" y="${size-3}" text-anchor="middle" fill="${col}" font-size="${fontSize}" font-weight="bold" font-family="monospace" stroke="#020c1a" stroke-width="2.5" paint-order="stroke">${Math.round(speed)}</text>
   </svg>`;
 }
 
 function buildCurrentArrowSVG(dir, speed, col) {
-  // V4 REFINED: Bigger, clearer current arrows
-  const size = 50, half = 25, len = 16;
+  // ORIGINAL STYLE: Simple dashed sticks
+  const size = 40, half = 20, len = 12;
   const r = dir*Math.PI/180;
   const sx=Math.sin(r)*len, sy=-Math.cos(r)*len;
   const tx=half-sx, ty=half-sy, bx=half+sx, by=half+sy;
-  const px1=tx+sy*0.4, py1=ty-sx*0.4;
-  const px2=tx-sy*0.4, py2=ty+sx*0.4;
+  const px1=tx+sy*0.3, py1=ty-sx*0.3;
+  const px2=tx-sy*0.3, py2=ty+sx*0.3;
   return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-    <line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="5,3" opacity="0.85"/>
-    <polygon points="${tx},${ty} ${px1},${py1} ${px2},${py2}" fill="${col}" opacity="0.85"/>
-    <text x="${half}" y="${size-3}" text-anchor="middle" fill="${col}" font-size="9" font-weight="bold" font-family="monospace" stroke="#020c1a" stroke-width="2.5" paint-order="stroke">${speed.toFixed(1)}kt</text>
+    <line x1="${bx}" y1="${by}" x2="${tx}" y2="${ty}" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-dasharray="4,2" opacity="0.7"/>
+    <polygon points="${tx},${ty} ${px1},${py1} ${px2},${py2}" fill="${col}" opacity="0.7"/>
+    <text x="${half}" y="${size-1}" text-anchor="middle" fill="${col}" font-size="7" font-weight="bold" font-family="monospace" stroke="black" stroke-width="2" paint-order="stroke">${speed.toFixed(1)}kt</text>
   </svg>`;
 }
 
