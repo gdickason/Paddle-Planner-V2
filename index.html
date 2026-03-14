@@ -485,6 +485,7 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
                   <div style="font-size:14px;font-weight:700;color:var(--cyan)">📋 Float Plan</div>
                   <div style="display:flex;gap:8px">
                     <button class="btn-ghost" style="padding:6px 14px;font-size:10px" onclick="shareTrip()">🔗 Share</button>
+                    <button class="btn-ghost" style="padding:6px 14px;font-size:10px;background:rgba(245,158,11,0.1);border-color:var(--amber);color:var(--amber)" onclick="exportMissionControl()">🎯 Mission Control</button>
                     <button class="btn-primary" style="padding:6px 14px;font-size:10px" onclick="exportFloatPlanPDF()">📄 PDF</button>
                   </div>
                 </div>
@@ -531,7 +532,28 @@ label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-
             <option value="">Any day</option>
           </select>
         </div>
-        <div class="wp-list" id="wp-list"><div style="color:var(--dim);font-size:11px;text-align:center;padding:20px 0">Press <b style="color:var(--cyan)">W</b> or click <b style="color:var(--cyan)">+ WP</b> then click the map</div></div>
+        <!-- Waypoint Type Selector -->
+        <div class="wp-type-bar" id="wp-type-bar" style="padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(34,211,238,0.02)">
+          <div style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px">📍 Waypoint Type</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <button class="wp-type-btn active" data-type="navigation" style="background:rgba(34,211,238,0.1);border:1.5px solid var(--cyan);color:var(--cyan);border-radius:6px;padding:6px;font-size:10px;font-weight:600;transition:all 0.15s">
+              ⚓ Nav
+            </button>
+            <button class="wp-type-btn" data-type="campsite" style="background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:6px;padding:6px;font-size:10px;font-weight:600;transition:all 0.15s">
+              ⛺ Camp
+            </button>
+            <button class="wp-type-btn" data-type="lunch" style="background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:6px;padding:6px;font-size:10px;font-weight:600;transition:all 0.15s">
+              🍽️ Lunch
+            </button>
+            <button class="wp-type-btn" data-type="break" style="background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:6px;padding:6px;font-size:10px;font-weight:600;transition:all 0.15s">
+              ☕ Break
+            </button>
+            <button class="wp-type-btn" data-type="poi" style="background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:6px;padding:6px;font-size:10px;font-weight:600;transition:all 0.15s">
+              📸 POI
+            </button>
+          </div>
+        </div>
+        <div class="wp-list" id="wp-list"><div style="color:var(--dim);font-size:11px;text-align:center;padding:20px 0">Select type above, then press <b style="color:var(--cyan)">W</b> or click <b style="color:var(--cyan)">+ WP</b></div></div>
         <div class="sidebar-actions">
           <button id="add-wp-btn" style="background:var(--bg);border-color:var(--b2);color:var(--muted)">+ WP <span style="font-size:8px;opacity:0.5">[W]</span></button>
           <button id="add-camp-btn" style="background:var(--bg);border-color:var(--b2);color:var(--muted)">⛺ Site</button>
@@ -1034,6 +1056,7 @@ let routeMarkers = [];
 let campMarkers  = [];
 let windMarkers  = [];
 let addMode = null;
+let selectedWpType = 'navigation'; // Default waypoint type
 let routeTiles = null;
 let routeSeamark = null;
 
@@ -1050,16 +1073,33 @@ function initRouteMap() {
   routeMap.on('click', e => {
     if (addMode === 'waypoint') {
       const trip = getActiveTrip(); if (!trip) return;
-      trip._wpCounter = (trip._wpCounter || 0) + 1;
       const activeDayNum = getActiveDayForAdd();
-      const wp = { lat: e.latlng.lat, lng: e.latlng.lng, name: `WP ${trip._wpCounter}`, id: Date.now(), day: activeDayNum || null };
+      
+      // Get type-specific name
+      const typeNames = {
+        navigation: 'Nav Point',
+        campsite: 'Campsite',
+        lunch: 'Lunch Stop',
+        break: 'Break',
+        poi: 'POI'
+      };
+      const typeName = typeNames[selectedWpType] || 'Waypoint';
+      
+      const wp = { 
+        lat: e.latlng.lat, 
+        lng: e.latlng.lng, 
+        name: typeName, 
+        type: selectedWpType,
+        id: Date.now(), 
+        day: activeDayNum || null 
+      };
       trip.waypoints.push(wp);
       save();
       // Stay in waypoint mode — only exit on Escape or button toggle
       refreshRouteMap();
       renderSidebar();
       const dayMsg = activeDayNum ? ` (Day ${activeDayNum})` : '';
-      toast(`📍 WP ${trip._wpCounter} placed${dayMsg} — click again or press Esc`);
+      toast(`📍 ${typeName} placed${dayMsg} — click again or press Esc`);
     } else if (addMode === 'campsite') {
       pendingCampLL = { lat: e.latlng.lat, lng: e.latlng.lng };
       addMode = null;
@@ -1112,16 +1152,27 @@ function refreshRouteMap() {
     }).addTo(routeMap);
   }
 
-  // Waypoint markers — draggable
+  // Waypoint markers — draggable, showing type icons
   wps.forEach((wp, i) => {
     const isS = i===0, isE = i===wps.length-1;
     const trip = getActiveTrip();
     const dayNum = wp.day;
     const col = isS?'#4ade80':isE?'#f87171':(dayNum ? DAY_COLORS[(dayNum-1)%DAY_COLORS.length] : '#22d3ee');
-    const lbl = isS?'S':isE?'E':String(i);
+    
+    // Get icon based on waypoint type
+    const typeIcons = {
+      navigation: '⚓',
+      campsite: '⛺',
+      lunch: '🍽️',
+      break: '☕',
+      poi: '📸'
+    };
+    const wpIcon = typeIcons[wp.type] || '⚓';
+    const lbl = isS?'🟢':isE?'🔴':wpIcon;
+    
     const icon = L.divIcon({
       className: '',
-      html: `<div style="width:28px;height:28px;background:${col};border:2.5px solid #020c1a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#020c1a;font-family:var(--mono);box-shadow:0 2px 8px rgba(0,0,0,0.5);cursor:grab">${lbl}</div>`,
+      html: `<div style="width:28px;height:28px;background:${col};border:2.5px solid #020c1a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${isS || isE ? '10px' : '14px'};color:#020c1a;box-shadow:0 2px 8px rgba(0,0,0,0.5);cursor:grab">${lbl}</div>`,
       iconSize:[28,28], iconAnchor:[14,14],
     });
     const marker = L.marker([wp.lat,wp.lng], {icon, draggable: true}).addTo(routeMap);
@@ -3432,6 +3483,379 @@ function exportFloatPlanPDF() {
 }
 
 // ╔═══════════════════════════════════════════════════════════════╗
+// ║  MISSION CONTROL - PRINTABLE TRIP REFERENCE                   ║
+// ╚═══════════════════════════════════════════════════════════════╝
+
+function exportMissionControl() {
+  const trip = getActiveTrip();
+  if (!trip || !trip.waypoints || trip.waypoints.length < 2) {
+    toast('⚠ Need a complete trip to export Mission Control');
+    return;
+  }
+  
+  const dates = getTripDates(trip);
+  
+  // Group waypoints by day
+  const dayGroups = {};
+  trip.waypoints.forEach(wp => {
+    const day = wp.day || 1;
+    if (!dayGroups[day]) dayGroups[day] = [];
+    dayGroups[day].push(wp);
+  });
+  
+  const sortedDays = Object.keys(dayGroups).map(Number).sort((a,b)=>a-b);
+  
+  // Helper functions
+  const nmBetween = (a, b) => {
+    const R = 3440.065;
+    const dLat = (b.lat - a.lat) * Math.PI / 180;
+    const dLon = (b.lng - a.lng) * Math.PI / 180;
+    const lat1 = a.lat * Math.PI / 180;
+    const lat2 = b.lat * Math.PI / 180;
+    const x = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
+    const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+    return R * c;
+  };
+  
+  const getHeading = (from, to) => {
+    const lat1 = from.lat * Math.PI / 180;
+    const lat2 = to.lat * Math.PI / 180;
+    const dLon = (to.lng - from.lng) * Math.PI / 180;
+    const y = Math.sin(dLon) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    const bearing = Math.atan2(y, x) * 180 / Math.PI;
+    return (bearing + 360) % 360;
+  };
+  
+  const getCardinal = (deg) => {
+    const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+    return dirs[Math.round(deg / 22.5) % 16];
+  };
+  
+  const typeIcons = {
+    navigation: '⚓',
+    campsite: '⛺',
+    lunch: '🍽️',
+    break: '☕',
+    poi: '📸'
+  };
+  
+  // Build day-by-day sections
+  let dayHtml = '';
+  sortedDays.forEach(dayNum => {
+    const dayWps = dayGroups[dayNum];
+    const dateStr = dates[dayNum-1] ? new Date(dates[dayNum-1]+'T12:00:00').toLocaleDateString('en',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) : `Day ${dayNum}`;
+    
+    // Calculate day distance
+    let dayDist = 0;
+    for (let i=1; i<dayWps.length; i++) {
+      dayDist += nmBetween(dayWps[i-1], dayWps[i]);
+    }
+    
+    // Get day start position (first waypoint)
+    const dayStart = dayWps[0];
+    
+    // Group waypoints by type for this day
+    const navWps = dayWps.filter(wp => !wp.type || wp.type === 'navigation');
+    const campWps = dayWps.filter(wp => wp.type === 'campsite');
+    const lunchWps = dayWps.filter(wp => wp.type === 'lunch');
+    const breakWps = dayWps.filter(wp => wp.type === 'break');
+    const poiWps = dayWps.filter(wp => wp.type === 'poi');
+    
+    // Get meals for this day
+    const dayMeals = trip.nutrition?.meals?.[`day${dayNum}`];
+    
+    dayHtml += `
+      <div class="mc-day-page" style="page-break-after:always;padding:40px">
+        <!-- Day Header -->
+        <div style="border-bottom:3px solid #22d3ee;padding-bottom:16px;margin-bottom:24px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div style="font-size:32px;font-weight:800;color:#22d3ee;font-family:'Space Mono',monospace">DAY ${dayNum}</div>
+              <div style="font-size:16px;color:#64748b;margin-top:4px">${dateStr}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:28px;font-weight:800;color:#f59e0b;font-family:'Space Mono',monospace">${dayDist.toFixed(1)} nm</div>
+              <div style="font-size:12px;color:#64748b">${(dayDist*1.15078).toFixed(1)} miles</div>
+              <div style="font-size:12px;color:#64748b;margin-top:4px">~${(dayDist/3).toFixed(1)} hrs @ 3 knots</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Navigation Points with Compass Headings -->
+        <div style="margin-bottom:24px">
+          <div style="font-size:14px;font-weight:700;color:#22d3ee;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;border-left:4px solid #22d3ee;padding-left:12px">⚓ Navigation Route</div>
+          <div style="background:#f8fafc;border-radius:8px;padding:16px">
+            ${(() => {
+              // Get classified waypoints (non-navigation)
+              const classifiedWps = dayWps.filter(wp => wp.type && wp.type !== 'navigation');
+              
+              // Build navigation display
+              return dayWps.map((wp, i) => {
+                const icon = typeIcons[wp.type] || '⚓';
+                const isStart = i === 0;
+                const isClassified = wp.type && wp.type !== 'navigation';
+                
+                if (isStart) {
+                  // START - show heading to first classified waypoint
+                  const firstClassified = classifiedWps[0];
+                  if (firstClassified) {
+                    const heading = getHeading(wp, firstClassified);
+                    const cardinal = getCardinal(heading);
+                    const dist = nmBetween(wp, firstClassified);
+                    return `<div style="margin-bottom:16px">
+                      <div style="font-size:14px;font-weight:700;color:#4ade80">🟢 START: ${wp.name}</div>
+                      <div style="font-size:11px;color:#64748b;margin-top:2px">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</div>
+                      <div style="margin-top:8px;padding:10px;background:linear-gradient(135deg, #ecfeff 0%, #cffafe 100%);border-radius:6px;border-left:4px solid #06b6d4">
+                        <div style="font-size:12px;color:#0e7490;font-weight:700;margin-bottom:4px">→ NAVIGATE TO: ${icon} ${firstClassified.name}</div>
+                        <div style="font-size:11px;color:#164e63;font-weight:600">${cardinal} (${Math.round(heading)}°) · ${dist.toFixed(1)} nm (${(dist*1.15078).toFixed(1)} mi)</div>
+                      </div>
+                    </div>`;
+                  } else {
+                    return `<div style="margin-bottom:12px">
+                      <div style="font-size:14px;font-weight:700;color:#4ade80">🟢 START: ${wp.name}</div>
+                      <div style="font-size:11px;color:#64748b;margin-top:2px">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</div>
+                    </div>`;
+                  }
+                }
+                
+                if (isClassified) {
+                  // Classified waypoint - show heading to NEXT classified waypoint
+                  const currentClassifiedIdx = classifiedWps.indexOf(wp);
+                  const nextClassified = classifiedWps[currentClassifiedIdx + 1];
+                  
+                  let nextNavBox = '';
+                  if (nextClassified) {
+                    const heading = getHeading(wp, nextClassified);
+                    const cardinal = getCardinal(heading);
+                    const dist = nmBetween(wp, nextClassified);
+                    const nextIcon = typeIcons[nextClassified.type] || '⚓';
+                    nextNavBox = `<div style="margin-top:8px;padding:10px;background:linear-gradient(135deg, #ecfeff 0%, #cffafe 100%);border-radius:6px;border-left:4px solid #06b6d4">
+                      <div style="font-size:12px;color:#0e7490;font-weight:700;margin-bottom:4px">→ NAVIGATE TO: ${nextIcon} ${nextClassified.name}</div>
+                      <div style="font-size:11px;color:#164e63;font-weight:600">${cardinal} (${Math.round(heading)}°) · ${dist.toFixed(1)} nm (${(dist*1.15078).toFixed(1)} mi)</div>
+                    </div>`;
+                  }
+                  
+                  return `<div style="margin-bottom:16px;padding-left:20px;border-left:3px solid #f59e0b">
+                    <div style="font-size:14px;font-weight:700;color:#0f172a">${icon} ${wp.name}</div>
+                    <div style="font-size:11px;color:#64748b;margin-top:2px">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</div>
+                    ${nextNavBox}
+                  </div>`;
+                } else {
+                  // Navigation waypoint - just list it (no heading)
+                  return `<div style="margin-bottom:8px;padding-left:20px;border-left:2px dashed #cbd5e1">
+                    <div style="font-size:12px;color:#64748b">${icon} ${wp.name}</div>
+                    <div style="font-size:10px;color:#94a3b8;margin-top:2px">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</div>
+                  </div>`;
+                }
+              }).join('');
+            })()}
+          </div>
+        </div>
+        
+        <!-- Waypoint Categories -->
+        ${campWps.length ? `
+        <div style="margin-bottom:16px">
+          <div style="font-size:12px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">⛺ Campsites</div>
+          <div style="background:#fffbeb;border-radius:6px;padding:12px">
+            ${campWps.map(wp => {
+              return `<div style="font-size:12px;margin-bottom:6px">
+                <span style="font-weight:600">${wp.name}</span>
+                <div style="font-size:10px;color:#92400e;margin-top:2px">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+        ` : ''}
+        
+        ${lunchWps.length ? `
+        <div style="margin-bottom:16px">
+          <div style="font-size:12px;font-weight:700;color:#06b6d4;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">🍽️ Lunch Stops</div>
+          <div style="background:#ecfeff;border-radius:6px;padding:12px">
+            ${lunchWps.map(wp => {
+              return `<div style="font-size:12px;margin-bottom:6px">
+                <span style="font-weight:600">${wp.name}</span>
+                <div style="font-size:10px;color:#164e63;margin-top:2px">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+        ` : ''}
+        
+        ${breakWps.length ? `
+        <div style="margin-bottom:16px">
+          <div style="font-size:12px;font-weight:700;color:#8b5cf6;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">☕ Break Points</div>
+          <div style="background:#faf5ff;border-radius:6px;padding:12px">
+            ${breakWps.map(wp => `<div style="font-size:12px;margin-bottom:6px"><span style="font-weight:600">${wp.name}</span></div>`).join('')}
+          </div>
+        </div>
+        ` : ''}
+        
+        ${poiWps.length ? `
+        <div style="margin-bottom:16px">
+          <div style="font-size:12px;font-weight:700;color:#ec4899;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">📸 Points of Interest</div>
+          <div style="background:#fdf2f8;border-radius:6px;padding:12px">
+            ${poiWps.map(wp => `<div style="font-size:12px;margin-bottom:6px"><span style="font-weight:600">${wp.name}</span></div>`).join('')}
+          </div>
+        </div>
+        ` : ''}
+        
+        <!-- Meals -->
+        ${dayMeals ? `
+        <div style="margin-bottom:16px">
+          <div style="font-size:12px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">🍴 Meals</div>
+          <div style="background:#f0fdf4;border-radius:6px;padding:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div>
+              <div style="font-size:10px;color:#065f46;font-weight:600;margin-bottom:4px">BREAKFAST</div>
+              <div style="font-size:11px;color:#047857">${dayMeals.breakfast || 'Not planned'}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#065f46;font-weight:600;margin-bottom:4px">LUNCH</div>
+              <div style="font-size:11px;color:#047857">${dayMeals.lunch || 'Not planned'}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#065f46;font-weight:600;margin-bottom:4px">DINNER</div>
+              <div style="font-size:11px;color:#047857">${dayMeals.dinner || 'Not planned'}</div>
+            </div>
+          </div>
+          ${dayMeals.snacks ? `<div style="font-size:11px;color:#047857;margin-top:8px"><b>Snacks:</b> ${dayMeals.snacks}</div>` : ''}
+        </div>
+        ` : ''}
+        
+        <!-- Notes -->
+        <div style="margin-top:24px;padding:16px;border:2px dashed #cbd5e1;border-radius:8px;background:white">
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px">📝 NOTES</div>
+          <div style="height:80px;border-bottom:1px solid #e2e8f0"></div>
+          <div style="height:20px"></div>
+        </div>
+      </div>
+    `;
+  });
+  
+  // Create Mission Control document
+  const mcDoc = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${trip.name} - Mission Control</title>
+  <style>
+    @page { size: letter; margin: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.5;
+      color: #0f172a;
+    }
+    @media print {
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Cover Page -->
+  <div style="page-break-after:always;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%);color:white;text-align:center;padding:40px">
+    <div style="font-size:48px;font-weight:800;margin-bottom:16px;font-family:'Space Mono',monospace;color:#22d3ee">${trip.name}</div>
+    <div style="font-size:24px;color:#94a3b8;margin-bottom:32px">${trip.area || 'Sea Kayak Expedition'}</div>
+    <div style="font-size:18px;color:#cbd5e1;margin-bottom:8px">${dates[0] ? new Date(dates[0]+'T12:00:00').toLocaleDateString('en',{month:'long',day:'numeric',year:'numeric'}) : 'Start Date'} → ${dates[dates.length-1] ? new Date(dates[dates.length-1]+'T12:00:00').toLocaleDateString('en',{month:'long',day:'numeric',year:'numeric'}) : 'End Date'}</div>
+    <div style="font-size:16px;color:#94a3b8">${dates.length} Days · ${trip.waypoints.length} Waypoints</div>
+    ${trip.participants ? `<div style="font-size:14px;color:#64748b;margin-top:24px">👥 ${trip.participants}</div>` : ''}
+    <div style="margin-top:48px;padding:24px;border:2px solid #22d3ee;border-radius:12px;background:rgba(34,211,238,0.1)">
+      <div style="font-size:14px;color:#22d3ee;font-weight:700;margin-bottom:12px">🎯 MISSION CONTROL</div>
+      <div style="font-size:12px;color:#cbd5e1">Printable Trip Reference & Navigation Guide</div>
+    </div>
+  </div>
+  
+  <!-- Trip Overview -->
+  <div style="page-break-after:always;padding:40px">
+    <div style="font-size:32px;font-weight:800;color:#22d3ee;margin-bottom:24px;border-bottom:3px solid #22d3ee;padding-bottom:12px">TRIP OVERVIEW</div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+      <div style="background:#f8fafc;padding:20px;border-radius:8px">
+        <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">Total Distance</div>
+        <div style="font-size:32px;font-weight:800;color:#22d3ee;font-family:'Space Mono',monospace">${trip.waypoints.reduce((sum, wp, i, arr) => i===0 ? 0 : sum + nmBetween(arr[i-1], wp), 0).toFixed(1)} nm</div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px">${(trip.waypoints.reduce((sum, wp, i, arr) => i===0 ? 0 : sum + nmBetween(arr[i-1], wp), 0)*1.15078).toFixed(1)} miles</div>
+      </div>
+      <div style="background:#f8fafc;padding:20px;border-radius:8px">
+        <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">Estimated Time</div>
+        <div style="font-size:32px;font-weight:800;color:#22d3ee;font-family:'Space Mono',monospace">${(trip.waypoints.reduce((sum, wp, i, arr) => i===0 ? 0 : sum + nmBetween(arr[i-1], wp), 0)/3).toFixed(1)} hrs</div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px">@ 3 knots average</div>
+      </div>
+    </div>
+    
+    <!-- Emergency Contacts -->
+    <div style="margin-bottom:24px;padding:20px;border:2px solid #ef4444;border-radius:8px;background:#fef2f2">
+      <div style="font-size:16px;font-weight:700;color:#dc2626;margin-bottom:12px">🚨 EMERGENCY CONTACTS</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px">
+        <div><b>Coast Guard:</b> VHF Channel 16</div>
+        <div><b>Emergency:</b> 911</div>
+        <div><b>Marine Forecast:</b> VHF WX Channels</div>
+        <div><b>Trip Contact:</b> ___________________</div>
+      </div>
+    </div>
+    
+    <!-- Radio Stations / VHF -->
+    <div style="margin-bottom:24px;padding:20px;background:#f8fafc;border-radius:8px">
+      <div style="font-size:14px;font-weight:700;color:#22d3ee;margin-bottom:12px">📻 RADIO INFORMATION</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:8px">
+        <b>VHF Weather:</b> NOAA Weather Radio (WX1-WX10)<br>
+        <b>Marine VHF:</b> Ch 16 (Emergency), Ch 9 (Calling), Ch 68-72 (Recreation)<br>
+        <b>Local Stations:</b> <span contenteditable="true" style="border-bottom:1px solid #cbd5e1;display:inline-block;min-width:400px;padding:2px">________________</span>
+      </div>
+    </div>
+    
+    <!-- Weather Overview -->
+    <div style="margin-bottom:24px;padding:20px;background:#ecfeff;border-radius:8px;border:1px solid #06b6d4">
+      <div style="font-size:14px;font-weight:700;color:#0e7490;margin-bottom:12px">🌤️ WEATHER OVERVIEW</div>
+      <div style="font-size:11px;color:#164e63;line-height:1.8">
+        <b>Forecast Source:</b> Check NOAA, Windy.com, local marine forecasts<br>
+        <b>Wind Limits:</b> Consider postponing if winds exceed 15-20 mph for open crossings<br>
+        <b>Sea State:</b> Monitor wave height and period forecasts<br>
+        <b>Weather Windows:</b> <span contenteditable="true" style="border-bottom:1px solid #0891b2;display:inline-block;min-width:300px;padding:2px">________________</span>
+      </div>
+    </div>
+    
+    <!-- Trip Notes -->
+    ${trip.notes ? `
+    <div style="margin-bottom:24px;padding:20px;background:#fefce8;border-radius:8px;border:1px solid #f59e0b">
+      <div style="font-size:14px;font-weight:700;color:#d97706;margin-bottom:8px">📝 TRIP NOTES</div>
+      <div style="font-size:12px;color:#78350f;white-space:pre-wrap">${trip.notes}</div>
+    </div>
+    ` : ''}
+    
+    <!-- Water & Supplies -->
+    ${trip.nutrition?.waterPerDay ? `
+    <div style="padding:20px;background:#f0fdf4;border-radius:8px;border:1px solid #10b981">
+      <div style="font-size:14px;font-weight:700;color:#047857;margin-bottom:8px">💧 WATER & SUPPLIES</div>
+      <div style="font-size:12px;color:#065f46">
+        <b>Water per day:</b> ${trip.nutrition.waterPerDay} L/person<br>
+        <b>Total water needed:</b> ${(trip.nutrition.waterPerDay * dates.length).toFixed(1)} L/person for ${dates.length} days
+      </div>
+    </div>
+    ` : ''}
+  </div>
+  
+  <!-- Day Pages -->
+  ${dayHtml}
+  
+  <!-- Back Page -->
+  <div style="padding:40px;text-align:center;color:#64748b">
+    <div style="font-size:12px;margin-bottom:8px">Generated by Paddle Planner</div>
+    <div style="font-size:10px">Professional Sea Kayak Expedition Planning</div>
+    <div style="font-size:10px;margin-top:16px">https://gdickason.github.io/Paddle-Planner-V2/</div>
+  </div>
+</body>
+</html>`;
+  
+  // Open in new window for printing
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(mcDoc);
+  printWindow.document.close();
+  
+  toast('🎯 Mission Control opened in new window - ready to print!');
+}
+
+// ╔═══════════════════════════════════════════════════════════════╗
 // ║  SHAREABLE TRIP URLS                                          ║
 // ╚═══════════════════════════════════════════════════════════════╝
 
@@ -3694,6 +4118,27 @@ document.addEventListener('DOMContentLoaded', function() {
   load();
   renderDashboard();
   showPage('dashboard');
+  
+  // Waypoint type selection
+  document.querySelectorAll('.wp-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.type;
+      selectedWpType = type;
+      
+      // Update button states
+      document.querySelectorAll('.wp-type-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'transparent';
+        b.style.borderColor = 'var(--border)';
+        b.style.color = 'var(--muted)';
+      });
+      
+      btn.classList.add('active');
+      btn.style.background = 'rgba(34,211,238,0.1)';
+      btn.style.borderColor = 'var(--cyan)';
+      btn.style.color = 'var(--cyan)';
+    });
+  });
 });
 </script>
 </body>
